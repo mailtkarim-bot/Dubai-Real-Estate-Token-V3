@@ -1,6 +1,21 @@
  # Dubai Real Estate Token V2 — System Architecture                                                                       
                                                                                                                               
      ## Overview                                                                                                              
+## Implementation Status
+
+| Module | Status | File |
+|--------|--------|------|
+| Token Core | ✅ Implemented | `src/core/DubaiRealEstateToken.sol` |
+| Identity Registry | ✅ Implemented | `src/compliance/IdentityRegistry.sol` |
+| Compliance Engine | ✅ Implemented | `src/compliance/ComplianceEngine.sol` |
+| Dividend Distribution | ✅ Implemented (in Token) | `src/core/DubaiRealEstateToken.sol` |
+| Claim Topics Registry | ⏳ Phase 2 Roadmap | Not implemented |
+| Trusted Issuers Registry | ⏳ Phase 2 Roadmap | Not implemented |
+| Identity Registry Storage | ⏳ Phase 2 Roadmap | Not implemented |
+| Oracles (Chainlink) | ⏳ Phase 2 Roadmap | Not implemented |
+| Governance (Timelock + Multisig) | ⏳ Phase 2 Roadmap | Not implemented |
+| UUPS Proxy | ⏳ Phase 2 Roadmap | Not implemented |
+
                                                                                                                               
      This architecture implements a Real World Asset (RWA) real estate tokenization platform targeting the Dubai market, fully
    compliant with the **ERC-3643 (T-REX)** standard for permissioned security tokens. The design enforces strict separation of
