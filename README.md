@@ -201,12 +201,13 @@ No files changed, compilation skipped
 | Test Suite                   | Passed | Failed | Skipped |
 +==========================================================+
 | DubaiRealEstateTokenFuzzTest | 8      | 0      | 0       |
+| DREITIntegrationTest         | 3      | 0      | 0       |
 | ComplianceEngineTest         | 46     | 0      | 0       |
 | DubaiRealEstateTokenTest     | 91     | 0      | 0       |
 | IdentityRegistryTest         | 76     | 0      | 0       |
 ╰------------------------------+--------+--------+---------╯
 
-Ran 4 test suites: 213 unit tests + 8 fuzzing tests passed, 0 failed, 0 skipped
+Ran 5 test suites: 213 unit tests + 3 integration tests + 8 fuzzing tests passed, 0 failed, 0 skipped
 ```
 
 ### Fuzzing Campaign
