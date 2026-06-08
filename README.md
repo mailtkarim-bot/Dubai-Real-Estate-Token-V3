@@ -384,7 +384,7 @@ Three distinct roles (`DEFAULT_ADMIN_ROLE`, `ISSUER_ROLE`, `REGULATOR_ROLE`) pre
 |------|--------|-------|
 | Unit tests | ✅ | 213/213 passed |
 | Fuzzing tests | ✅ | 8 campaigns × 10,000 runs, 0 failures |
-| Security bug fixes | ✅ | 8 real vulnerabilities patched |
+| Security bug fixes | ✅ | 8 security hardening improvements |
 | Core contract coverage | ✅ | >96% lines, >94% branches |
 | Sepolia testnet deployment | ✅ | June 8, 2026 — 3 contracts verified |
 | Etherscan verification | ✅ | Auto-verified on deployment |
