@@ -1,0 +1,29 @@
+[profile.default]                                                                                                        
+     src = "src"                                                                                                              
+     out = "out"                                                                                                              
+     libs = ["lib"]                                                                                                           
+     test = "test"                                                                                                            
+     script = "script"                                                                                                        
+     fs_permissions = [{ access = "read-write", path = "./deployments"}]                                                      
+                                                                                                                              
+     # Solidity 0.8.28 fixe — pas de ^, pas de ~. Déterminisme absolu.                                                        
+     solc = "0.8.28"                                                                                                          
+     evm_version = "shanghai"                                                                                                 
+                                                                                                                              
+     # Optimiseur : activé mais conservateur pour la sécurité                                                                 
+     optimizer = true                                                                                                         
+     optimizer_runs = 200                                                                                                     
+                                                                                                                              
+     # Fuzzing : 10 000 runs par défaut pour la robustesse                                                                    
+     fuzz = { runs = 10000 }                                                                                                  
+                                                                                                                              
+     # Invariant testing : profondeur de 32 pour les chemins adversariaux                                                     
+     invariant = { runs = 256, depth = 32 }                                                                                   
+                                                                                                                              
+     # Formatter aligné sur le Solidity Style Guide officiel                                                                  
+     fmt = { line_length = 120, tab_width = 4, bracket_spacing = true }                                                       
+                                                                                                                              
+     # Vérification sur les explorers (Sepolia + Polygon Amoy)                                                                
+     [etherscan]                                                                                                              
+     sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://api-sepolia.etherscan.io/api" }                                 
+     amoy = { key = "${POLYGONSCAN_API_KEY}", url = "https://api-amoy.polygonscan.com/api" }                                                                                                         
