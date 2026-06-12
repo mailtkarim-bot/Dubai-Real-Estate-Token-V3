@@ -9,7 +9,7 @@
 ![Fuzzing](https://img.shields.io/badge/Fuzzing-8%2F8%20%C3%97%2010k%20runs-brightgreen)
 ![Coverage](https://img.shields.io/badge/Coverage-96.8%25%20core%20contracts-2ECC71)
 ![Sepolia](https://img.shields.io/badge/Sepolia-Deployed%20%26%20Verified-blue)
-![Frontend](https://img.shields.io/badge/Frontend-Live%20Demo-gold)
+[![Frontend](https://img.shields.io/badge/Frontend-Live%20Demo-gold)](https://mailtkarim-bot.github.io/dubai-real-estate-v2/)
 ![License](https://img.shields.io/badge/License-MIT-F4D03F)
 ![Internal Review](https://img.shields.io/badge/Internal%20Review-Passed-yellow)
 ![External Audit](https://img.shields.io/badge/External%20Audit-Pending-red)
@@ -19,12 +19,19 @@ Smart contract portfolio project demonstrating on-chain identity registry, autom
 
 > ⚠️ **Not production-ready.** No external security audit has been performed. For production RWA tokenization, consult a licensed entity and a Tier-1 audit firm.
 
+<div align="center">
+
+[![View Live Demo](https://img.shields.io/badge/🔗%20View%20Live%20Demo%20on%20GitHub%20Pages-2C2C2C?style=for-the-badge&logo=github&logoColor=white)](https://mailtkarim-bot.github.io/dubai-real-estate-v2/)
+
+</div>
+
 </div>
 
 ---
 
 ## Table of Contents
 
+- [🌐 Live Frontend Demo](#-live-frontend-demo)
 - [Vision](#vision)
 - [Why ERC-3643?](#why-erc-3643)
 - [Security & Compliance](#-security--compliance)
@@ -33,7 +40,6 @@ Smart contract portfolio project demonstrating on-chain identity registry, autom
 - [Coverage Report](#-coverage-report)
 - [Deployment](#-deployment)
 - [Sepolia Testnet](#-sepolia-testnet)
-- [Frontend Demo](#-frontend-demo)
 - [Tech Stack](#-tech-stack)
 - [Key Features](#-key-features)
 - [Pre-Production Checklist](#-pre-production-checklist)
@@ -62,6 +68,37 @@ This project is **not licensed by VARA, DFSA, or any regulatory authority** in t
 - Do not use this code to tokenize real assets without legal counsel and a licensed entity.
 - Do not offer tokenization, audit, or compliance services to third parties without appropriate licenses.
 - The deployed Sepolia contracts are for demonstration only and should not hold real value.
+
+---
+
+## 🌐 Live Frontend Demo
+
+A production-grade React interface is deployed on **GitHub Pages** and connected to the verified Sepolia testnet contracts.
+
+<div align="center">
+
+[![View Live Demo](https://img.shields.io/badge/🔗%20Open%20Live%20Demo-181717?style=for-the-badge&logo=github&logoColor=white)](https://mailtkarim-bot.github.io/dubai-real-estate-v2/)
+
+</div>
+
+| Resource | Details |
+|----------|---------|
+| **Live DApp** | [https://mailtkarim-bot.github.io/dubai-real-estate-v2/](https://mailtkarim-bot.github.io/dubai-real-estate-v2/) |
+| **Frontend Code** | [`frontend/`](./frontend) |
+| **Network** | Sepolia Testnet (Chain ID: 11155111) |
+| **Wallet** | MetaMask, Rainbow, Coinbase Wallet (via RainbowKit + wagmi) |
+| **Pages** | Home, Investor Dashboard, Admin Panel |
+| **Stack** | React 19, Vite 8, Tailwind CSS v4, wagmi/viem, RainbowKit, Recharts |
+
+### Features
+
+- **Connect Wallet** — multi-wallet support via RainbowKit
+- **Investor Dashboard** — view token balance, KYC status, and claim USDC dividends
+- **Admin Panel** — mint tokens, manage compliance, and distribute dividends
+- **Real-Time Data** — reads directly from the verified Sepolia contracts
+- **Responsive UI** — dark-mode-first design with Tailwind CSS v4
+
+> ⚠️ **Demo only.** Connect with a Sepolia-funded test wallet. Do not send mainnet funds.
 
 ---
 
@@ -116,7 +153,7 @@ During development, the following issues were identified and corrected in the co
 
 ```
 dubai-real-estate-v2/
-├── 📁 src/
+├── 📁 src/                                     # Solidity smart contracts
 │   ├── core/
 │   │   └── DubaiRealEstateToken.sol          # ERC-3643 T-REX token + dividends
 │   ├── compliance/
@@ -124,14 +161,19 @@ dubai-real-estate-v2/
 │   │   └── ComplianceEngine.sol              # Transfer rules & freeze logic
 │   └── mocks/
 │       └── MockUSDC.sol                      # Sepolia USDC mock for local tests
-├── 📁 test/
+├── 📁 test/                                    # Foundry tests
 │   ├── unit/                                 # Foundry unit tests
 │   ├── integration/                          # End-to-end flows
 │   └── fuzzing/                              # 8 fuzzing campaigns × 10k runs
-├── 📁 script/deploy/
+├── 📁 script/deploy/                           # Deployment scripts
 │   ├── DeployLocal.s.sol                     # Anvil local deployment
 │   ├── DeployTestnet.s.sol                   # Sepolia deployment + verify
 │   └── DeployMainnet.s.sol                   # Mainnet deployment template
+├── 📁 frontend/                                # React + Vite + wagmi DApp
+│   ├── src/                                  # Components, pages, ABIs, wagmi config
+│   ├── public/                               # Static assets
+│   ├── package.json
+│   └── vite.config.ts
 ├── 📁 broadcast/                             # Deployment transactions
 ├── 📁 deployments/                           # Deployment metadata
 │   ├── local.json
@@ -325,21 +367,6 @@ forge script script/deploy/DeployTestnet.s.sol \
   --verify \
   --etherscan-api-key $ETHERSCAN_API_KEY
 ```
-
----
-
-## 🌐 Frontend Demo
-
-A React + Vite + wagmi/viem web interface is deployed on **GitHub Pages** and connected to the Sepolia testnet contracts.
-
-| Resource | Link |
-|----------|------|
-| **Live DApp** | [https://mailtkarim-bot.github.io/dubai-real-estate-v2/](https://mailtkarim-bot.github.io/dubai-real-estate-v2/) |
-| **Network** | Sepolia Testnet (Chain ID: 11155111) |
-| **Wallet** | MetaMask (injected connector) |
-| **Pages** | Home, Investor Dashboard, Admin Panel |
-
-> ⚠️ **Demo only.** Connect with a Sepolia-funded test wallet. Do not send mainnet funds.
 
 ---
 
