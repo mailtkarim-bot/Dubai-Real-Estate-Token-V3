@@ -9,6 +9,7 @@
 ![Fuzzing](https://img.shields.io/badge/Fuzzing-8%2F8%20%C3%97%2010k%20runs-brightgreen)
 ![Coverage](https://img.shields.io/badge/Coverage-96.8%25%20core%20contracts-2ECC71)
 ![Sepolia](https://img.shields.io/badge/Sepolia-Deployed%20%26%20Verified-blue)
+![Frontend](https://img.shields.io/badge/Frontend-Live%20Demo-gold)
 ![License](https://img.shields.io/badge/License-MIT-F4D03F)
 ![Internal Review](https://img.shields.io/badge/Internal%20Review-Passed-yellow)
 ![External Audit](https://img.shields.io/badge/External%20Audit-Pending-red)
@@ -32,6 +33,7 @@ Smart contract portfolio project demonstrating on-chain identity registry, autom
 - [Coverage Report](#-coverage-report)
 - [Deployment](#-deployment)
 - [Sepolia Testnet](#-sepolia-testnet)
+- [Frontend Demo](#-frontend-demo)
 - [Tech Stack](#-tech-stack)
 - [Key Features](#-key-features)
 - [Pre-Production Checklist](#-pre-production-checklist)
@@ -326,11 +328,27 @@ forge script script/deploy/DeployTestnet.s.sol \
 
 ---
 
+## 🌐 Frontend Demo
+
+A React + Vite + wagmi/viem web interface is deployed on **GitHub Pages** and connected to the Sepolia testnet contracts.
+
+| Resource | Link |
+|----------|------|
+| **Live DApp** | [https://mailtkarim-bot.github.io/dubai-real-estate-v2/](https://mailtkarim-bot.github.io/dubai-real-estate-v2/) |
+| **Network** | Sepolia Testnet (Chain ID: 11155111) |
+| **Wallet** | MetaMask (injected connector) |
+| **Pages** | Home, Investor Dashboard, Admin Panel |
+
+> ⚠️ **Demo only.** Connect with a Sepolia-funded test wallet. Do not send mainnet funds.
+
+---
+
 ## 🛠️ Tech Stack
 
 | Layer | Technology |
 |-------|------------|
 | **Smart Contract** | Solidity 0.8.28, OpenZeppelin Contracts v5 |
+| **Frontend** | React 19, Vite 8, Tailwind CSS v4, wagmi/viem |
 | **Standard** | ERC-3643 (T-REX), ERC-20 |
 | **Testing** | Foundry (Forge + Cast), 213 unit tests, 8 fuzzing campaigns |
 | **Coverage** | `forge coverage` + lcov HTML report |
@@ -393,7 +411,7 @@ Three distinct roles (`DEFAULT_ADMIN_ROLE`, `ISSUER_ROLE`, `REGULATOR_ROLE`) pre
 | External audit | ⏳ | Trail of Bits / OpenZeppelin / CertiK |
 | TimelockController | ⏳ | Replace direct admin before mainnet |
 | Multisig (Gnosis Safe) | ⏳ | Owner = Safe with 3/5 signers |
-| Frontend integration | ⏳ | DApp React + wallet connect |
+| Frontend integration | ✅ | DApp React + wallet connect (GitHub Pages) |
 | Legal compliance | ⏳ | VARA / DFSA regulatory consultation |
 
 ---
