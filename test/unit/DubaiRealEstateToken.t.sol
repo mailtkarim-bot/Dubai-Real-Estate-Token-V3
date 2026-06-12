@@ -7,8 +7,8 @@ import "../../src/compliance/IdentityRegistry.sol";
 import "../../src/compliance/ComplianceEngine.sol";
 import "../../src/interfaces/IIdentityRegistry.sol";
 import "../mocks/MockUSDC.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title MockIdentity
@@ -24,7 +24,6 @@ contract MockIdentity {
  * @dev Tests cover: mint, burn, transfer, dividends, freeze, forced ops.
  */
 contract DubaiRealEstateTokenTest is Test {
-
     // ============================================
     // CONTRACTS
     // ============================================
@@ -56,10 +55,14 @@ contract DubaiRealEstateTokenTest is Test {
     // ============================================
     event TokensMinted(address indexed to, uint256 amount, address indexed actor);
     event TokensBurned(address indexed from, uint256 amount, address indexed actor);
-    event DividendsDistributed(uint256 amount, uint256 newDividendPerToken, uint256 totalDividendPerToken, address indexed actor);
+    event DividendsDistributed(
+        uint256 amount, uint256 newDividendPerToken, uint256 totalDividendPerToken, address indexed actor
+    );
     event DividendClaimed(address indexed by, uint256 amount);
     event DividendSynced(address indexed investor, uint256 amount);
-    event ForcedTransfer(address indexed from, address indexed to, uint256 amount, string reason, address indexed actor);
+    event ForcedTransfer(
+        address indexed from, address indexed to, uint256 amount, string reason, address indexed actor
+    );
     event ForcedBurn(address indexed from, uint256 amount, string reason, address indexed actor);
     event InvestorFrozen(address indexed investor, string reason, uint256 timestamp, address indexed actor);
     event InvestorUnfrozen(address indexed investor, uint256 timestamp, address indexed actor);
@@ -68,12 +71,12 @@ contract DubaiRealEstateTokenTest is Test {
     // SETUP
     // ============================================
     function setUp() public {
-        admin     = makeAddr("admin");
-        issuer    = makeAddr("issuer");
+        admin = makeAddr("admin");
+        issuer = makeAddr("issuer");
         regulator = makeAddr("regulator");
-        karim     = makeAddr("karim");
-        bob       = makeAddr("bob");
-        hacker    = makeAddr("hacker");
+        karim = makeAddr("karim");
+        bob = makeAddr("bob");
+        hacker = makeAddr("hacker");
 
         // Deploy USDC mock
         vm.prank(admin);
@@ -96,12 +99,7 @@ contract DubaiRealEstateTokenTest is Test {
 
         // Deploy Token
         token = new DubaiRealEstateToken(
-            address(usdc),
-            address(registry),
-            address(compliance),
-            "Dubai Real Estate",
-            "DREIT",
-            admin
+            address(usdc), address(registry), address(compliance), "Dubai Real Estate", "DREIT", admin
         );
         token.grantRole(token.ISSUER_ROLE(), issuer);
         token.grantRole(token.REGULATOR_ROLE(), regulator);
@@ -168,11 +166,7 @@ contract DubaiRealEstateTokenTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                issuerRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, issuerRole)
         );
         token.mint(karim, INITIAL_MINT);
     }
@@ -186,11 +180,7 @@ contract DubaiRealEstateTokenTest is Test {
 
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__MaxSupplyExceeded.selector,
-                tooMuch,
-                maxSupply
-            )
+            abi.encodeWithSelector(DubaiRealEstateToken.DREIT__MaxSupplyExceeded.selector, tooMuch, maxSupply)
         );
         token.mint(karim, tooMuch);
     }
@@ -211,12 +201,7 @@ contract DubaiRealEstateTokenTest is Test {
         address stranger = makeAddr("stranger");
 
         vm.prank(issuer);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__KYCNotVerified.selector,
-                stranger
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__KYCNotVerified.selector, stranger));
         token.mint(stranger, INITIAL_MINT);
     }
 
@@ -257,11 +242,7 @@ contract DubaiRealEstateTokenTest is Test {
         // Karim had 1000 tokens during distribution of 10_000 USDC over 3000 total
         // dividendPerToken = (10_000 * 1e6) * 1e18 / 3000e18 = 3333333
         // Karim's share = 1000e18 * 3333333 / 1e18 = 3333333000
-        assertEq(
-            token.getClaimableDividends(karim),
-            3333333000,
-            "Dividends must be synced"
-        );
+        assertEq(token.getClaimableDividends(karim), 3333333000, "Dividends must be synced");
     }
 
     // ============================================
@@ -272,13 +253,85 @@ contract DubaiRealEstateTokenTest is Test {
         token.mint(karim, INITIAL_MINT);
 
         vm.prank(issuer);
+        vm.expectRevert(abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__IdentityHasBalance.selector, karim));
+        registry.deleteIdentity(karim);
+    }
+
+    // ============================================
+    // TEST 10c: REGISTRY — deleteIdentity rejects if holder has pending dividends
+    // ============================================
+    function test_DeleteIdentity_HasPendingDividends() public {
+        // Mint to Karim and Bob so a transfer can sync Karim's dividends
+        vm.startPrank(issuer);
+        token.mint(karim, INITIAL_MINT);
+        token.mint(bob, INITIAL_MINT);
+        vm.stopPrank();
+
+        // Distribute dividends so Karim has a claimable amount
+        uint256 dividend = 1000e6;
+        vm.startPrank(issuer);
+        usdc.approve(address(token), dividend);
+        token.distributeDividends(dividend);
+        vm.stopPrank();
+
+        assertGt(token.pendingDividendsOf(karim), 0, "Karim must have pending dividends");
+
+        // Karim transfers ALL tokens to Bob. This syncs his dividends into pendingDividends
+        // but does NOT claim them. After the transfer Karim has 0 balance and 0 lastClaimed delta,
+        // yet pendingDividends[karim] remains positive.
+        vm.prank(karim);
+        token.transfer(bob, INITIAL_MINT);
+
+        assertEq(token.balanceOf(karim), 0, "Karim balance must be 0");
+        assertGt(token.pendingDividendsOf(karim), 0, "Pending dividends must remain after transfer");
+
+        vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__IdentityHasBalance.selector,
-                karim
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__IdentityHasPendingDividends.selector, karim)
         );
         registry.deleteIdentity(karim);
+    }
+
+    // ============================================
+    // TEST 10d: DIVIDENDS — pendingDividendsOf matches getClaimableDividends
+    // ============================================
+    function test_PendingDividendsOf_MatchesClaimable() public {
+        vm.prank(issuer);
+        token.mint(karim, INITIAL_MINT);
+
+        uint256 dividend = 1500e6;
+        vm.startPrank(issuer);
+        usdc.approve(address(token), dividend);
+        token.distributeDividends(dividend);
+        vm.stopPrank();
+
+        assertEq(
+            token.pendingDividendsOf(karim),
+            token.getClaimableDividends(karim),
+            "pendingDividendsOf must equal getClaimableDividends"
+        );
+    }
+
+    // ============================================
+    // TEST 10e: DIVIDENDS — too-small distribution reverts before pulling USDC
+    // ============================================
+    function test_DistributeDividends_TooSmall_RevertsBeforeTransfer() public {
+        vm.prank(issuer);
+        token.mint(karim, INITIAL_MINT);
+
+        // Need a very large supply relative to the dividend to make newDividendPerToken == 0
+        // totalSupply = 1000e18, amount = 1 => (1 * 1e18) / 1000e18 = 0
+        uint256 tooSmall = 1;
+        uint256 issuerBalanceBefore = usdc.balanceOf(issuer);
+
+        vm.startPrank(issuer);
+        usdc.approve(address(token), tooSmall);
+        vm.expectRevert(DubaiRealEstateToken.DREIT__InvalidAmount.selector);
+        token.distributeDividends(tooSmall);
+        vm.stopPrank();
+
+        assertEq(usdc.balanceOf(issuer), issuerBalanceBefore, "USDC must NOT have been transferred on revert");
+        assertEq(usdc.balanceOf(address(token)), 0, "Contract must not have received USDC");
     }
 
     // ============================================
@@ -302,12 +355,7 @@ contract DubaiRealEstateTokenTest is Test {
         address stranger = makeAddr("stranger");
 
         vm.prank(karim);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__KYCNotVerified.selector,
-                stranger
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__KYCNotVerified.selector, stranger));
         token.transfer(stranger, 100e18);
     }
 
@@ -332,12 +380,7 @@ contract DubaiRealEstateTokenTest is Test {
         compliance.freezeInvestor(karim, "suspicious_activity");
 
         vm.prank(karim);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__AccountFrozen.selector,
-                karim
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__AccountFrozen.selector, karim));
         token.transfer(bob, 100e18);
     }
 
@@ -426,11 +469,7 @@ contract DubaiRealEstateTokenTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                issuerRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, issuerRole)
         );
         token.distributeDividends(10_000 * 1e6);
     }
@@ -500,11 +539,7 @@ contract DubaiRealEstateTokenTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                regRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, regRole)
         );
         token.forcedTransfer(karim, bob, 100e18, "test");
     }
@@ -635,11 +670,7 @@ contract DubaiRealEstateTokenTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                adminRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, adminRole)
         );
         token.sweepDust();
     }
@@ -692,12 +723,7 @@ contract DubaiRealEstateTokenTest is Test {
         token.approve(bob, 100e18);
 
         vm.prank(bob);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__KYCNotVerified.selector,
-                stranger
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__KYCNotVerified.selector, stranger));
         token.transferFrom(karim, stranger, 100e18);
     }
 
@@ -714,12 +740,7 @@ contract DubaiRealEstateTokenTest is Test {
         token.approve(bob, 100e18);
 
         vm.prank(bob);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__AccountFrozen.selector,
-                karim
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__AccountFrozen.selector, karim));
         token.transferFrom(karim, bob, 100e18);
     }
 
@@ -732,11 +753,7 @@ contract DubaiRealEstateTokenTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                adminRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, adminRole)
         );
         token.setComplianceEngine(newEngine);
     }
@@ -763,12 +780,7 @@ contract DubaiRealEstateTokenTest is Test {
         address stranger = makeAddr("stranger");
 
         vm.prank(regulator);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__KYCNotVerified.selector,
-                stranger
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__KYCNotVerified.selector, stranger));
         token.forcedTransfer(karim, stranger, 100e18, "test");
     }
 
@@ -782,12 +794,7 @@ contract DubaiRealEstateTokenTest is Test {
         compliance.freezeInvestor(karim, "test");
 
         vm.prank(karim);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__AccountFrozen.selector,
-                karim
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__AccountFrozen.selector, karim));
         token.burn(100e18);
     }
 
@@ -811,7 +818,9 @@ contract DubaiRealEstateTokenTest is Test {
 
         // KYC stranger with short expiry so we can mint, then expire
         vm.prank(admin);
-        registry.registerIdentity(stranger, address(strangerId), 1, IIdentityRegistry.InvestorType.Retail, block.timestamp + 1);
+        registry.registerIdentity(
+            stranger, address(strangerId), 1, IIdentityRegistry.InvestorType.Retail, block.timestamp + 1
+        );
 
         vm.prank(issuer);
         token.mint(stranger, 100e18);
@@ -820,12 +829,7 @@ contract DubaiRealEstateTokenTest is Test {
         vm.warp(block.timestamp + 2);
 
         vm.prank(stranger);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__KYCNotVerified.selector,
-                stranger
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__KYCNotVerified.selector, stranger));
         token.burn(50e18);
     }
 
@@ -852,11 +856,7 @@ contract DubaiRealEstateTokenTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                regRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, regRole)
         );
         token.forcedBurn(karim, 100e18, "test");
     }
@@ -949,11 +949,7 @@ contract DubaiRealEstateTokenTest is Test {
 
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__TransferNotCompliant.selector,
-                address(0),
-                bob
-            )
+            abi.encodeWithSelector(DubaiRealEstateToken.DREIT__TransferNotCompliant.selector, address(0), bob)
         );
         token.mint(bob, 100e18);
     }
@@ -996,9 +992,7 @@ contract DubaiRealEstateTokenTest is Test {
     function test_SetIdentityRegistry_EOA() public {
         address eoa = makeAddr("eoa");
         vm.prank(admin);
-        vm.expectRevert(
-            abi.encodeWithSelector(DubaiRealEstateToken.DREIT__NotContract.selector, eoa)
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__NotContract.selector, eoa));
         token.setIdentityRegistry(eoa);
     }
 
@@ -1061,13 +1055,7 @@ contract DubaiRealEstateTokenTest is Test {
         compliance.restrictCountry(COUNTRY_FRANCE);
 
         vm.prank(regulator);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__TransferNotCompliant.selector,
-                karim,
-                bob
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__TransferNotCompliant.selector, karim, bob));
         token.forcedTransfer(karim, bob, 100e18, "test");
     }
 
@@ -1099,11 +1087,7 @@ contract DubaiRealEstateTokenTest is Test {
 
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__MaxSupplyExceeded.selector,
-                100_000e18,
-                50_000e18
-            )
+            abi.encodeWithSelector(DubaiRealEstateToken.DREIT__MaxSupplyExceeded.selector, 100_000e18, 50_000e18)
         );
         token.batchMint(recipients, amounts);
     }
@@ -1149,11 +1133,7 @@ contract DubaiRealEstateTokenTest is Test {
 
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__TransferNotCompliant.selector,
-                address(0),
-                ali
-            )
+            abi.encodeWithSelector(DubaiRealEstateToken.DREIT__TransferNotCompliant.selector, address(0), ali)
         );
         token.batchMint(recipients, amounts);
     }
@@ -1168,13 +1148,7 @@ contract DubaiRealEstateTokenTest is Test {
         compliance.restrictCountry(COUNTRY_UAE);
 
         vm.prank(karim);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__TransferNotCompliant.selector,
-                karim,
-                bob
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__TransferNotCompliant.selector, karim, bob));
         token.transfer(bob, 100e18);
     }
 
@@ -1187,12 +1161,7 @@ contract DubaiRealEstateTokenTest is Test {
         vm.warp(block.timestamp + 2 * 365 days);
 
         vm.prank(karim);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__KYCNotVerified.selector,
-                karim
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__KYCNotVerified.selector, karim));
         token.transfer(bob, 100e18);
     }
 
@@ -1292,12 +1261,7 @@ contract DubaiRealEstateTokenTest is Test {
         compliance.freezeInvestor(bob, "sanctions");
 
         vm.prank(regulator);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__AccountFrozen.selector,
-                bob
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__AccountFrozen.selector, bob));
         token.forcedTransfer(karim, bob, 100e18, "test");
     }
 
@@ -1312,12 +1276,7 @@ contract DubaiRealEstateTokenTest is Test {
         compliance.freezeInvestor(karim, "test");
 
         vm.prank(karim);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__AccountFrozen.selector,
-                karim
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__AccountFrozen.selector, karim));
         token.claimDividends();
     }
 
@@ -1366,12 +1325,7 @@ contract DubaiRealEstateTokenTest is Test {
         compliance.freezeInvestor(bob, "sanctions");
 
         vm.prank(karim);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__AccountFrozen.selector,
-                bob
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__AccountFrozen.selector, bob));
         token.transfer(bob, 100e18);
     }
 
@@ -1381,9 +1335,7 @@ contract DubaiRealEstateTokenTest is Test {
     function test_SetComplianceEngine_EOA() public {
         address eoa = makeAddr("eoa");
         vm.prank(admin);
-        vm.expectRevert(
-            abi.encodeWithSelector(DubaiRealEstateToken.DREIT__NotContract.selector, eoa)
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__NotContract.selector, eoa));
         token.setComplianceEngine(eoa);
     }
 
@@ -1416,12 +1368,7 @@ contract DubaiRealEstateTokenTest is Test {
         amounts[0] = 100e18;
 
         vm.prank(issuer);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                DubaiRealEstateToken.DREIT__AccountFrozen.selector,
-                karim
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__AccountFrozen.selector, karim));
         token.batchMint(recipients, amounts);
     }
 
@@ -1480,5 +1427,4 @@ contract DubaiRealEstateTokenTest is Test {
             // branch covered
         }
     }
-
 }

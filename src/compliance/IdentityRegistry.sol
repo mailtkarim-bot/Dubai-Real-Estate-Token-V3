@@ -1,20 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IIdentityRegistry} from "../interfaces/IIdentityRegistry.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import { IIdentityRegistry } from "../interfaces/IIdentityRegistry.sol";
+import { IDividendAware } from "../interfaces/IDividendAware.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title IdentityRegistry
  * @author Steph Rayan
  * @notice Production implementation of the ERC-3643 compliant identity registry — v2.1.
- * @custom:security Internal review only. Not production-ready without external audit.
- * @custom:standard ERC-3643 (T-REX) v4.x — Phase 1 compliant.
+ * @custom:security Educational / portfolio project. Internal review only. No external audit.
+ *      Not production-ready without a Tier-1 audit, legal opinion and regulated entity.
+ * @custom:standard ERC-3643 (T-REX) v4.x — Phase 1 simplified (no ERC-734/735 claims).
  */
 contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
-
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
 
     mapping(address => address) private _identities;
@@ -175,10 +176,7 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
         emit TrustedIssuerAdded(trustedIssuer, claimTopics, msg.sender);
     }
 
-    function removeTrustedIssuer(address trustedIssuer)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function removeTrustedIssuer(address trustedIssuer) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (!_isTrustedIssuer[trustedIssuer]) {
             revert IIdentityRegistry__NotAuthorizedIssuer(trustedIssuer);
         }
@@ -200,10 +198,10 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
         emit TrustedIssuerRemoved(trustedIssuer, msg.sender);
     }
 
-    function updateTrustedIssuerClaimTopics(
-        address trustedIssuer,
-        uint256[] calldata claimTopics
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updateTrustedIssuerClaimTopics(address trustedIssuer, uint256[] calldata claimTopics)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         if (!_isTrustedIssuer[trustedIssuer]) {
             revert IIdentityRegistry__NotAuthorizedIssuer(trustedIssuer);
         }
@@ -223,19 +221,11 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
         return _isTrustedIssuer[trustedIssuer];
     }
 
-    function getTrustedIssuerClaimTopics(address trustedIssuer)
-        external
-        view
-        returns (uint256[] memory)
-    {
+    function getTrustedIssuerClaimTopics(address trustedIssuer) external view returns (uint256[] memory) {
         return _trustedIssuerClaimTopics[trustedIssuer];
     }
 
-    function registerIdentity(
-        address investor,
-        address identityAddr,
-        uint16 country
-    )
+    function registerIdentity(address investor, address identityAddr, uint16 country)
         external
         onlyRole(ISSUER_ROLE)
         whenNotPaused
@@ -321,11 +311,7 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
         emit IdentityUpdated(investor, oldIdentity, identityAddr);
     }
 
-    function updateInvestorType(address investor, InvestorType invType)
-        external
-        onlyRole(ISSUER_ROLE)
-        whenNotPaused
-    {
+    function updateInvestorType(address investor, InvestorType invType) external onlyRole(ISSUER_ROLE) whenNotPaused {
         if (_identities[investor] == address(0)) {
             revert IIdentityRegistry__IdentityNotRegistered(investor);
         }
@@ -334,11 +320,7 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
         emit InvestorTypeUpdated(investor, invType);
     }
 
-    function updateKYCExpiry(address investor, uint256 expiry)
-        external
-        onlyRole(ISSUER_ROLE)
-        whenNotPaused
-    {
+    function updateKYCExpiry(address investor, uint256 expiry) external onlyRole(ISSUER_ROLE) whenNotPaused {
         if (_identities[investor] == address(0)) {
             revert IIdentityRegistry__IdentityNotRegistered(investor);
         }
@@ -350,17 +332,19 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
         emit KYCExpiryUpdated(investor, expiry);
     }
 
-    function deleteIdentity(address investor)
-        external
-        onlyRole(ISSUER_ROLE)
-        whenNotPaused
-    {
+    function deleteIdentity(address investor) external onlyRole(ISSUER_ROLE) whenNotPaused {
         address identityAddr = _identities[investor];
         if (identityAddr == address(0)) {
             revert IIdentityRegistry__IdentityNotRegistered(investor);
         }
-        if (token != address(0) && IERC20(token).balanceOf(investor) > 0) {
-            revert IIdentityRegistry__IdentityHasBalance(investor);
+        if (token != address(0)) {
+            if (IERC20(token).balanceOf(investor) > 0) {
+                revert IIdentityRegistry__IdentityHasBalance(investor);
+            }
+            uint256 pending = IDividendAware(token).pendingDividendsOf(investor);
+            if (pending > 0) {
+                revert IIdentityRegistry__IdentityHasPendingDividends(investor);
+            }
         }
 
         delete _identities[investor];

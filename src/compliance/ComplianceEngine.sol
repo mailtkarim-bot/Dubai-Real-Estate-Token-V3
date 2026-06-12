@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {IComplianceEngine} from "../interfaces/IComplianceEngine.sol";
-import {IIdentityRegistry} from "../interfaces/IIdentityRegistry.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import { IComplianceEngine } from "../interfaces/IComplianceEngine.sol";
+import { IIdentityRegistry } from "../interfaces/IIdentityRegistry.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title ComplianceEngine
  * @author Steph Rayan
  * @notice Regulatory compliance engine enforcing VARA/DLD rules — v2.1.
- * @custom:security Tier-1 audit validated. Removed amount==0 bypass. Fixed unbindToken event.
+ * @custom:security Educational / portfolio project. Internal review only. No external audit.
+ *      Not production-ready without a Tier-1 audit, legal opinion and regulated entity.
  * @dev v2 adds stateful hooks for modular compliance tracking.
  *      Production modular compliance (IModule pattern) planned for Phase 2.
  */
 contract ComplianceEngine is IComplianceEngine, AccessControl, Pausable {
-
     bytes32 public constant REGULATOR_ROLE = keccak256("REGULATOR_ROLE");
 
     address public token;
@@ -66,7 +66,15 @@ contract ComplianceEngine is IComplianceEngine, AccessControl, Pausable {
     /**
      * @notice Core compliance logic. No amount bypass — frozen accounts are blocked regardless of amount.
      */
-    function _checkRules(address from, address to, uint256 amount) internal view returns (bool) {
+    function _checkRules(
+        address from,
+        address to,
+        uint256 /*amount*/
+    )
+        internal
+        view
+        returns (bool)
+    {
         if (paused()) return false;
 
         if (from != address(0) && !identityRegistry.isVerified(from)) return false;
@@ -89,15 +97,38 @@ contract ComplianceEngine is IComplianceEngine, AccessControl, Pausable {
         return true;
     }
 
-    function transferred(address /*from*/, address /*to*/, uint256 /*amount*/) external override {
+    function transferred(
+        address,
+        /*from*/
+        address,
+        /*to*/
+        uint256 /*amount*/
+    )
+        external
+        override
+    {
         // Phase 2: Modular compliance tracking (daily limits, counters, etc.)
     }
 
-    function created(address /*to*/, uint256 /*amount*/) external override {
+    function created(
+        address,
+        /*to*/
+        uint256 /*amount*/
+    )
+        external
+        override
+    {
         // Phase 2: Modular compliance tracking
     }
 
-    function destroyed(address /*from*/, uint256 /*amount*/) external override {
+    function destroyed(
+        address,
+        /*from*/
+        uint256 /*amount*/
+    )
+        external
+        override
+    {
         // Phase 2: Modular compliance tracking
     }
 

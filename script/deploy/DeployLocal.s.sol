@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Script, console2} from "forge-std/Script.sol";
-import {HelperConfig} from "../HelperConfig.s.sol";
-import {MockUSDC} from "../../test/mocks/MockUSDC.sol";
-import {MockIdentity} from "../../test/mocks/MockIdentity.sol";
-import {IdentityRegistry} from "../../src/compliance/IdentityRegistry.sol";
-import {ComplianceEngine} from "../../src/compliance/ComplianceEngine.sol";
-import {DubaiRealEstateToken} from "../../src/core/DubaiRealEstateToken.sol";
+import { Script, console2 } from "forge-std/Script.sol";
+import { HelperConfig } from "../HelperConfig.s.sol";
+import { MockUSDC } from "../../test/mocks/MockUSDC.sol";
+import { MockIdentity } from "../../test/mocks/MockIdentity.sol";
+import { IdentityRegistry } from "../../src/compliance/IdentityRegistry.sol";
+import { ComplianceEngine } from "../../src/compliance/ComplianceEngine.sol";
+import { DubaiRealEstateToken } from "../../src/core/DubaiRealEstateToken.sol";
 
 /**
  * @title DeployLocal
@@ -36,12 +36,7 @@ contract DeployLocal is Script, HelperConfig {
 
         // 4. DubaiRealEstateToken
         DubaiRealEstateToken token = new DubaiRealEstateToken(
-            address(usdc),
-            address(registry),
-            address(compliance),
-            "Dubai Real Estate",
-            "DREIT",
-            deployer
+            address(usdc), address(registry), address(compliance), "Dubai Real Estate", "DREIT", deployer
         );
         console2.log("[4/4] DubaiRealEstateToken:", address(token));
 
@@ -60,12 +55,24 @@ contract DeployLocal is Script, HelperConfig {
 
         // 8. Persist deployment addresses
         string memory json = string.concat(
-            '{"chainId":"', vm.toString(block.chainid), '",',
-            '"deployer":"', vm.toString(deployer), '",',
-            '"usdc":"', vm.toString(address(usdc)), '",',
-            '"registry":"', vm.toString(address(registry)), '",',
-            '"compliance":"', vm.toString(address(compliance)), '",',
-            '"token":"', vm.toString(address(token)), '"}'
+            '{"chainId":"',
+            vm.toString(block.chainid),
+            '",',
+            '"deployer":"',
+            vm.toString(deployer),
+            '",',
+            '"usdc":"',
+            vm.toString(address(usdc)),
+            '",',
+            '"registry":"',
+            vm.toString(address(registry)),
+            '",',
+            '"compliance":"',
+            vm.toString(address(compliance)),
+            '",',
+            '"token":"',
+            vm.toString(address(token)),
+            '"}'
         );
         vm.createDir("./deployments", true);
         vm.writeFile("./deployments/local.json", json);
@@ -74,12 +81,7 @@ contract DeployLocal is Script, HelperConfig {
         console2.log("File: ./deployments/local.json");
     }
 
-    function _seedData(
-        IdentityRegistry registry,
-        DubaiRealEstateToken token,
-        MockUSDC usdc,
-        address issuer
-    ) internal {
+    function _seedData(IdentityRegistry registry, DubaiRealEstateToken token, MockUSDC usdc, address issuer) internal {
         MockIdentity id1 = new MockIdentity();
         MockIdentity id2 = new MockIdentity();
 

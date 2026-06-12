@@ -1,24 +1,26 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IIdentityRegistry} from "../interfaces/IIdentityRegistry.sol";
-import {IComplianceEngine} from "../interfaces/IComplianceEngine.sol";
+import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IIdentityRegistry } from "../interfaces/IIdentityRegistry.sol";
+import { IComplianceEngine } from "../interfaces/IComplianceEngine.sol";
+import { IDividendAware } from "../interfaces/IDividendAware.sol";
 
 /**
  * @title DubaiRealEstateToken
  * @author Steph Rayan
  * @notice ERC-3643 inspired permissioned security token for Dubai RWA real estate — v3.1.
- * @custom:security Internal review only. Bugs patched post-audit. Not production-ready without external audit.
+ * @custom:security Educational / portfolio project. Internal review only. No external audit.
+ *      Not production-ready without a Tier-1 audit, legal opinion and regulated entity.
  *      Dust auto-redistributed. All transfers gated by KYC + Compliance.
  * @dev Dividends use Pull-over-Push with retroactive-gain protection.
  */
-contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard {
+contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard, IDividendAware {
     using SafeERC20 for IERC20;
 
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
@@ -40,26 +42,14 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
     event TokensMinted(address indexed to, uint256 amount, address indexed actor);
     event TokensBurned(address indexed from, uint256 amount, address indexed actor);
     event DividendsDistributed(
-        uint256 amount,
-        uint256 newDividendPerToken,
-        uint256 totalDividendPerToken,
-        address indexed actor
+        uint256 amount, uint256 newDividendPerToken, uint256 totalDividendPerToken, address indexed actor
     );
     event DividendClaimed(address indexed by, uint256 amount);
     event DividendSynced(address indexed investor, uint256 amount);
     event ForcedTransfer(
-        address indexed from,
-        address indexed to,
-        uint256 amount,
-        string reason,
-        address indexed actor
+        address indexed from, address indexed to, uint256 amount, string reason, address indexed actor
     );
-    event ForcedBurn(
-        address indexed from,
-        uint256 amount,
-        string reason,
-        address indexed actor
-    );
+    event ForcedBurn(address indexed from, uint256 amount, string reason, address indexed actor);
     event IdentityRegistrySet(address indexed oldRegistry, address indexed newRegistry, address indexed actor);
     event ComplianceEngineSet(address indexed oldEngine, address indexed newEngine, address indexed actor);
 
@@ -183,12 +173,7 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
         }
     }
 
-    function burn(uint256 amount)
-        external
-        whenNotPaused
-        nonReentrant
-        notFrozen(msg.sender)
-    {
+    function burn(uint256 amount) external whenNotPaused nonReentrant notFrozen(msg.sender) {
         if (amount == 0) revert DREIT__InvalidAmount();
         address investor = msg.sender;
 
@@ -200,25 +185,23 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
         _syncDividends(investor);
 
         uint256 claimable = pendingDividends[investor];
-        if (claimable > 0) {
-            pendingDividends[investor] = 0;
-            totalPendingDividends -= claimable;
-            stablecoin.safeTransfer(investor, claimable);
-            emit DividendClaimed(investor, claimable);
-        }
+        pendingDividends[investor] = 0;
+        totalPendingDividends -= claimable;
 
+        // Checks-Effects-Interactions: burn and update compliance state BEFORE
+        // any external stablecoin transfer.
         _burn(investor, amount);
         complianceEngine.destroyed(investor, amount);
 
         emit TokensBurned(investor, amount, msg.sender);
+
+        if (claimable > 0) {
+            stablecoin.safeTransfer(investor, claimable);
+            emit DividendClaimed(investor, claimable);
+        }
     }
 
-    function forcedTransfer(
-        address from,
-        address to,
-        uint256 amount,
-        string calldata reason
-    )
+    function forcedTransfer(address from, address to, uint256 amount, string calldata reason)
         external
         onlyRole(REGULATOR_ROLE)
         whenNotPaused
@@ -236,17 +219,14 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
             revert DREIT__TransferNotCompliant(from, to);
         }
 
+        // _transfer already triggers _update, which calls complianceEngine.transferred().
+        // Calling it again here would double-count stateful compliance modules.
         _transfer(from, to, amount);
-        complianceEngine.transferred(from, to, amount);
 
         emit ForcedTransfer(from, to, amount, reason, msg.sender);
     }
 
-    function forcedBurn(
-        address from,
-        uint256 amount,
-        string calldata reason
-    )
+    function forcedBurn(address from, uint256 amount, string calldata reason)
         external
         onlyRole(REGULATOR_ROLE)
         whenNotPaused
@@ -259,39 +239,39 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
         _syncDividends(from);
 
         uint256 claimable = pendingDividends[from];
-        if (claimable > 0) {
-            pendingDividends[from] = 0;
-            totalPendingDividends -= claimable;
-            stablecoin.safeTransfer(from, claimable);
-            emit DividendClaimed(from, claimable);
-        }
+        pendingDividends[from] = 0;
+        totalPendingDividends -= claimable;
 
+        // Checks-Effects-Interactions: burn and update compliance state BEFORE
+        // any external stablecoin transfer.
         _burn(from, amount);
         complianceEngine.destroyed(from, amount);
 
         emit ForcedBurn(from, amount, reason, msg.sender);
+
+        if (claimable > 0) {
+            stablecoin.safeTransfer(from, claimable);
+            emit DividendClaimed(from, claimable);
+        }
     }
 
     /**
      * @notice Distributes dividends to all token holders.
      * @dev Automatically redistributes accumulated dust from previous rounds.
      */
-    function distributeDividends(uint256 amount)
-        external
-        onlyRole(ISSUER_ROLE)
-        whenNotPaused
-        nonReentrant
-    {
+    function distributeDividends(uint256 amount) external onlyRole(ISSUER_ROLE) whenNotPaused nonReentrant {
         if (amount == 0) revert DREIT__InvalidAmount();
         if (totalSupply() == 0) revert DREIT__InvalidAmount();
 
         uint256 totalAmount = amount + dust;
-        dust = 0;
 
-        stablecoin.safeTransferFrom(msg.sender, address(this), amount);
-
+        // Validate arithmetic BEFORE pulling any stablecoin to avoid
+        // locking user funds as recoverable dust on revert.
         uint256 newDividendPerToken = (totalAmount * 1e18) / totalSupply();
         if (newDividendPerToken == 0) revert DREIT__InvalidAmount();
+
+        dust = 0;
+        stablecoin.safeTransferFrom(msg.sender, address(this), amount);
 
         uint256 distributed = (newDividendPerToken * totalSupply()) / 1e18;
 
@@ -302,12 +282,7 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
         emit DividendsDistributed(amount, newDividendPerToken, dividendPerToken, msg.sender);
     }
 
-    function claimDividends()
-        external
-        whenNotPaused
-        nonReentrant
-        notFrozen(msg.sender)
-    {
+    function claimDividends() external whenNotPaused nonReentrant notFrozen(msg.sender) {
         _validateKYC(msg.sender);
         _syncDividends(msg.sender);
 
@@ -381,11 +356,7 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
         }
     }
 
-    function _update(address from, address to, uint256 amount)
-        internal
-        override
-        whenNotPaused
-    {
+    function _update(address from, address to, uint256 amount) internal override whenNotPaused {
         if (from == to && from != address(0)) revert DREIT__SelfTransfer();
         if (to == address(this)) revert DREIT__SelfTransfer();
 
@@ -414,22 +385,14 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
         }
     }
 
-    function setIdentityRegistry(address _registry)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        nonZeroAddress(_registry)
-    {
+    function setIdentityRegistry(address _registry) external onlyRole(DEFAULT_ADMIN_ROLE) nonZeroAddress(_registry) {
         if (_registry.code.length == 0) revert DREIT__NotContract(_registry);
         address oldRegistry = address(identityRegistry);
         identityRegistry = IIdentityRegistry(_registry);
         emit IdentityRegistrySet(oldRegistry, _registry, msg.sender);
     }
 
-    function setComplianceEngine(address _engine)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        nonZeroAddress(_engine)
-    {
+    function setComplianceEngine(address _engine) external onlyRole(DEFAULT_ADMIN_ROLE) nonZeroAddress(_engine) {
         if (_engine.code.length == 0) revert DREIT__NotContract(_engine);
         address oldEngine = address(complianceEngine);
         complianceEngine = IComplianceEngine(_engine);
@@ -453,5 +416,24 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
         if (delta == 0) return pendingDividends[account];
 
         return pendingDividends[account] + ((balance * delta) / 1e18);
+    }
+
+    /**
+     * @inheritdoc IDividendAware
+     * @notice Exposes the total dividend liability for an account.
+     * @dev Used by IdentityRegistry to block identity deletion while
+     *      dividends are still owed to the investor.
+     */
+    function pendingDividendsOf(address account) external view returns (uint256 claimable) {
+        uint256 balance = balanceOf(account);
+        uint256 synced = pendingDividends[account];
+
+        if (balance == 0) return synced;
+
+        uint256 lastClaimedValue = lastClaimed[account];
+        uint256 delta = dividendPerToken - lastClaimedValue;
+        if (delta == 0) return synced;
+
+        return synced + ((balance * delta) / 1e18);
     }
 }

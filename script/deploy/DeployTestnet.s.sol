@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Script, console2} from "forge-std/Script.sol";
-import {HelperConfig} from "../HelperConfig.s.sol";
-import {IdentityRegistry} from "../../src/compliance/IdentityRegistry.sol";
-import {ComplianceEngine} from "../../src/compliance/ComplianceEngine.sol";
-import {DubaiRealEstateToken} from "../../src/core/DubaiRealEstateToken.sol";
+import { Script, console2 } from "forge-std/Script.sol";
+import { HelperConfig } from "../HelperConfig.s.sol";
+import { IdentityRegistry } from "../../src/compliance/IdentityRegistry.sol";
+import { ComplianceEngine } from "../../src/compliance/ComplianceEngine.sol";
+import { DubaiRealEstateToken } from "../../src/core/DubaiRealEstateToken.sol";
 
 /**
  * @title DeployTestnet
@@ -29,12 +29,7 @@ contract DeployTestnet is Script, HelperConfig {
         console2.log("ComplianceEngine:", address(compliance));
 
         DubaiRealEstateToken token = new DubaiRealEstateToken(
-            usdc,
-            address(registry),
-            address(compliance),
-            "Dubai Real Estate",
-            "DREIT",
-            deployer
+            usdc, address(registry), address(compliance), "Dubai Real Estate", "DREIT", deployer
         );
         console2.log("DubaiRealEstateToken:", address(token));
 
@@ -50,12 +45,24 @@ contract DeployTestnet is Script, HelperConfig {
 
         // Persist
         string memory json = string.concat(
-            '{"chainId":"', vm.toString(block.chainid), '",',
-            '"deployer":"', vm.toString(deployer), '",',
-            '"usdc":"', vm.toString(usdc), '",',
-            '"registry":"', vm.toString(address(registry)), '",',
-            '"compliance":"', vm.toString(address(compliance)), '",',
-            '"token":"', vm.toString(address(token)), '"}'
+            '{"chainId":"',
+            vm.toString(block.chainid),
+            '",',
+            '"deployer":"',
+            vm.toString(deployer),
+            '",',
+            '"usdc":"',
+            vm.toString(usdc),
+            '",',
+            '"registry":"',
+            vm.toString(address(registry)),
+            '",',
+            '"compliance":"',
+            vm.toString(address(compliance)),
+            '",',
+            '"token":"',
+            vm.toString(address(token)),
+            '"}'
         );
         vm.createDir("./deployments", true);
         vm.writeFile("./deployments/testnet.json", json);

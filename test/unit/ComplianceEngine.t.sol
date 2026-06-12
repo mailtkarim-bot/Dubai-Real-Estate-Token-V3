@@ -5,8 +5,8 @@ import "forge-std/Test.sol";
 import "../../src/compliance/ComplianceEngine.sol";
 import "../../src/compliance/IdentityRegistry.sol";
 import "../../src/interfaces/IIdentityRegistry.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title MockIdentity
@@ -23,7 +23,6 @@ contract MockIdentity {
  *      is allowed to buy/sell tokenized real estate.
  */
 contract ComplianceEngineTest is Test {
-
     // ============================================
     // CONTRACTS UNDER TEST
     // ============================================
@@ -34,12 +33,12 @@ contract ComplianceEngineTest is Test {
     // ============================================
     // ACTORS
     // ============================================
-    address public admin;      // Project owner
-    address public regulator;  // VARA officer
-    address public hacker;     // Unauthorized actor
-    address public karim;      // Investor UAE
-    address public bob;        // Investor France
-    address public ali;        // Investor Iran (restricted)
+    address public admin; // Project owner
+    address public regulator; // VARA officer
+    address public hacker; // Unauthorized actor
+    address public karim; // Investor UAE
+    address public bob; // Investor France
+    address public ali; // Investor Iran (restricted)
 
     // ============================================
     // CONSTANTS
@@ -63,12 +62,12 @@ contract ComplianceEngineTest is Test {
     // SETUP
     // ============================================
     function setUp() public {
-        admin     = makeAddr("admin");
+        admin = makeAddr("admin");
         regulator = makeAddr("regulator");
-        hacker    = makeAddr("hacker");
-        karim     = makeAddr("karim");
-        bob       = makeAddr("bob");
-        ali       = makeAddr("ali");
+        hacker = makeAddr("hacker");
+        karim = makeAddr("karim");
+        bob = makeAddr("bob");
+        ali = makeAddr("ali");
 
         // Deploy IdentityRegistry
         vm.startPrank(admin);
@@ -212,11 +211,7 @@ contract ComplianceEngineTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                regRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, regRole)
         );
         compliance.freezeInvestor(karim, "test");
     }
@@ -279,11 +274,7 @@ contract ComplianceEngineTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                regRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, regRole)
         );
         compliance.restrictCountry(COUNTRY_IRAN);
     }
@@ -382,11 +373,7 @@ contract ComplianceEngineTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                adminRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, adminRole)
         );
         compliance.pause();
     }
@@ -417,11 +404,7 @@ contract ComplianceEngineTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                adminRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, adminRole)
         );
         compliance.setIdentityRegistry(newRegistry);
     }
@@ -456,11 +439,7 @@ contract ComplianceEngineTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                adminRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, adminRole)
         );
         compliance.bindToken(tokenAddr);
     }
@@ -492,11 +471,7 @@ contract ComplianceEngineTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                adminRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, adminRole)
         );
         compliance.unpause();
     }
@@ -572,11 +547,7 @@ contract ComplianceEngineTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                adminRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, adminRole)
         );
         compliance.unbindToken(tokenAddr);
     }
@@ -657,5 +628,4 @@ contract ComplianceEngineTest is Test {
         vm.expectRevert(ComplianceEngine.ComplianceEngine__ZeroAddress.selector);
         compliance.bindToken(address(0));
     }
-
 }

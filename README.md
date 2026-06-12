@@ -5,7 +5,7 @@
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.28-363636?logo=solidity&logoColor=white)
 ![Foundry](https://img.shields.io/badge/Foundry-Tested-00B4D8?logo=ethereum&logoColor=white)
 ![OpenZeppelin](https://img.shields.io/badge/OpenZeppelin-v5-4E5EE4?logo=openzeppelin&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-213%2F213%20Passing-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-227%2F227%20Passing-brightgreen)
 ![Fuzzing](https://img.shields.io/badge/Fuzzing-8%2F8%20%C3%97%2010k%20runs-brightgreen)
 ![Coverage](https://img.shields.io/badge/Coverage-96.8%25%20core%20contracts-2ECC71)
 ![Sepolia](https://img.shields.io/badge/Sepolia-Deployed%20%26%20Verified-blue)
@@ -15,7 +15,9 @@
 ![External Audit](https://img.shields.io/badge/External%20Audit-Pending-red)
 
 **Educational RWA tokenization architecture inspired by ERC-3643 (T-REX).**  
-Smart contract portfolio project demonstrating on-chain identity registry, automated compliance engine, dividend distribution, and Etherscan-verified Sepolia deployment.
+Smart contract portfolio project demonstrating on-chain identity registry, automated compliance engine, dividend distribution, and Etherscan-verified Sepolia deployment. This is a learning project, not a production security token.
+
+> ⚠️ **Not ERC-3643 certified.** Phase 1 implements a simplified identity registry and compliance engine. Full T-REX features (ERC-734/735 claims, trusted issuers validation, modular compliance modules) are on the Phase 2 roadmap.
 
 > ⚠️ **Not production-ready.** No external security audit has been performed. For production RWA tokenization, consult a licensed entity and a Tier-1 audit firm.
 
@@ -104,15 +106,15 @@ A production-grade React interface is deployed on **GitHub Pages** and connected
 
 ## Why ERC-3643?
 
-Unlike standard ERC-20 tokens, DREIT implements the **T-REX (Token for Regulated Exchanges)** standard:
+DREIT is **inspired by** the **T-REX (Token for Regulated Exchanges)** standard, which is the institutional benchmark for permissioned security tokens:
 
 - **On-chain identity** — every holder must be KYC-verified in the `IdentityRegistry`
 - **Transfer validation** — every transfer is pre-validated by the `ComplianceEngine`
-- **Regulator controls** — freeze accounts, restrict jurisdictions, enforce holding limits
+- **Regulator controls** — freeze accounts, restrict jurisdictions, enforce holding limits (Phase 2)
 - **Permissioned mint/burn** — only authorized issuers can create or destroy tokens
 - **Forced transfers/burns** — regulator-enforced actions with on-chain audit trail
 
-This architecture is designed for **regulated primary issuance** and **secondary trading on permissioned exchanges**.
+This architecture is a **portfolio-grade foundation** for regulated primary issuance. It is not a certified T-REX implementation and should not be marketed as such without completing the Phase 2 roadmap.
 
 ---
 
@@ -146,6 +148,15 @@ During development, the following issues were identified and corrected in the co
 | 6 | `deleteIdentity` permitted with token balance | Revert if `balanceOf > 0` |
 | 7 | KYC expiry could be set to 0 (instant lockout) | Enforce minimum 1-day expiry |
 | 8 | Compliance engine not linked to token at deployment | `compliance.bindToken(address(token))` in deploy script |
+
+### Additional Hardening — v3.2
+
+| # | Vulnerability | Fix |
+|---|---------------|-----|
+| 9 | `forcedTransfer` double-called `complianceEngine.transferred()` hook | Removed explicit hook call; `_transfer` already triggers it once |
+| 10 | `burn` / `forcedBurn` transferred stablecoins before burning tokens (CEI violation) | Reordered to burn and clear state before `safeTransfer` |
+| 11 | `distributeDividends` pulled stablecoins before validating distribution math | Moved `newDividendPerToken == 0` check before `safeTransferFrom` |
+| 12 | `deleteIdentity` allowed identity deletion while dividends were pending | Added `pendingDividendsOf()` check in `IdentityRegistry` |
 
 ---
 
@@ -251,7 +262,7 @@ No files changed, compilation skipped
 | IdentityRegistryTest         | 76     | 0      | 0       |
 ╰------------------------------+--------+--------+---------╯
 
-Ran 5 test suites: 213 unit tests + 3 integration tests + 8 fuzzing tests passed, 0 failed, 0 skipped
+Ran 5 test suites: 227 unit tests + 3 integration tests + 8 fuzzing tests passed, 0 failed, 0 skipped
 ```
 
 ### Fuzzing Campaign
@@ -376,7 +387,7 @@ forge script script/deploy/DeployTestnet.s.sol \
 |-------|------------|
 | **Smart Contract** | Solidity 0.8.28, OpenZeppelin Contracts v5 |
 | **Frontend** | React 19, Vite 8, Tailwind CSS v4, wagmi/viem |
-| **Standard** | ERC-3643 (T-REX), ERC-20 |
+| **Standard** | ERC-3643 (T-REX) inspired, ERC-20 |
 | **Testing** | Foundry (Forge + Cast), 213 unit tests, 8 fuzzing campaigns |
 | **Coverage** | `forge coverage` + lcov HTML report |
 | **CI/CD** | GitHub Actions ready |
@@ -388,8 +399,8 @@ forge script script/deploy/DeployTestnet.s.sol \
 
 ## 🎯 Key Features
 
-### 1. ERC-3643 T-REX Compliance
-Full implementation of the Token for Regulated Exchanges standard — identity registry, compliance engine, and permissioned transfers.
+### 1. ERC-3643 T-REX Inspired Architecture
+Permissioned token design inspired by the Token for Regulated Exchanges standard — identity registry, compliance engine, and permissioned transfers. Full T-REX certification (ERC-734/735 claims, trusted issuers) is on the Phase 2 roadmap.
 
 ### 2. On-Chain Identity Registry
 KYC status, investor type, country of residence, and expiry are stored on-chain. Only verified wallets can hold or transfer DREIT.

@@ -9,7 +9,6 @@ pragma solidity 0.8.28;
  * @custom:standard ERC-3643 (T-REX) v4.x
  */
 interface IIdentityRegistry {
-
     enum InvestorType {
         Retail,
         Accredited,
@@ -35,6 +34,7 @@ interface IIdentityRegistry {
     error IIdentityRegistry__KYCExpired(address investor);
     error IIdentityRegistry__KYCExpiryTooSoon(uint256 expiry);
     error IIdentityRegistry__IdentityHasBalance(address investor);
+    error IIdentityRegistry__IdentityHasPendingDividends(address investor);
 
     event IdentityRegistered(address indexed investor, address indexed identity);
     event IdentityRemoved(address indexed investor, address indexed identity);
@@ -57,7 +57,10 @@ interface IIdentityRegistry {
     function contains(address investor) external view returns (bool);
     function investorCount() external view returns (uint256);
     function investorType(address investor) external view returns (InvestorType);
-    function isVerifiedWithDetails(address investor) external view returns (VerificationStatus status, InvestorType invType);
+    function isVerifiedWithDetails(address investor)
+        external
+        view
+        returns (VerificationStatus status, InvestorType invType);
     function kycExpiry(address investor) external view returns (uint256 expiry);
     function updateKYCExpiry(address investor, uint256 expiry) external;
 
@@ -76,11 +79,21 @@ interface IIdentityRegistry {
     function getTrustedIssuerClaimTopics(address trustedIssuer) external view returns (uint256[] memory);
 
     function registerIdentity(address investor, address identity, uint16 country) external;
-    function registerIdentity(address investor, address identity, uint16 country, InvestorType investorType_, uint256 kycExpiry_) external;
+    function registerIdentity(
+        address investor,
+        address identity,
+        uint16 country,
+        InvestorType investorType_,
+        uint256 kycExpiry_
+    ) external;
     function updateCountry(address investor, uint16 country) external;
     function updateIdentity(address investor, address identity) external;
     function updateInvestorType(address investor, InvestorType investorType) external;
     function deleteIdentity(address investor) external;
 
-    function batchRegisterIdentity(address[] calldata investors, address[] calldata identities, uint16[] calldata countries) external;
+    function batchRegisterIdentity(
+        address[] calldata investors,
+        address[] calldata identities,
+        uint16[] calldata countries
+    ) external;
 }

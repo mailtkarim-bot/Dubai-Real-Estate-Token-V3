@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Test} from "forge-std/Test.sol";
-import {DubaiRealEstateToken} from "../../src/core/DubaiRealEstateToken.sol";
-import {IdentityRegistry} from "../../src/compliance/IdentityRegistry.sol";
-import {ComplianceEngine} from "../../src/compliance/ComplianceEngine.sol";
-import {MockUSDC} from "../mocks/MockUSDC.sol";
-import {MockIdentity} from "../mocks/MockIdentity.sol";
-import {IIdentityRegistry} from "../../src/interfaces/IIdentityRegistry.sol";
+import { Test } from "forge-std/Test.sol";
+import { DubaiRealEstateToken } from "../../src/core/DubaiRealEstateToken.sol";
+import { IdentityRegistry } from "../../src/compliance/IdentityRegistry.sol";
+import { ComplianceEngine } from "../../src/compliance/ComplianceEngine.sol";
+import { MockUSDC } from "../mocks/MockUSDC.sol";
+import { MockIdentity } from "../mocks/MockIdentity.sol";
+import { IIdentityRegistry } from "../../src/interfaces/IIdentityRegistry.sol";
 
 /**
  * @title DubaiRealEstateTokenFuzzTest
@@ -43,12 +43,7 @@ contract DubaiRealEstateTokenFuzzTest is Test {
         registry = new IdentityRegistry(admin);
         compliance = new ComplianceEngine(admin, address(registry));
         token = new DubaiRealEstateToken(
-            address(usdc),
-            address(registry),
-            address(compliance),
-            "Dubai Real Estate",
-            "DREIT",
-            admin
+            address(usdc), address(registry), address(compliance), "Dubai Real Estate", "DREIT", admin
         );
 
         token.grantRole(token.ISSUER_ROLE(), issuer);
@@ -150,10 +145,7 @@ contract DubaiRealEstateTokenFuzzTest is Test {
      *         This verifies that compliance.isCompliant(from,...) is checked
      *         and not bypassed by using a zero-address or internal state.
      */
-    function testFuzz_ForcedTransferRespectsComplianceFrom(
-        uint256 mintAmount,
-        uint256 forcedAmount
-    ) public {
+    function testFuzz_ForcedTransferRespectsComplianceFrom(uint256 mintAmount, uint256 forcedAmount) public {
         mintAmount = bound(mintAmount, 100, token.MAX_SUPPLY() / 2);
         forcedAmount = bound(forcedAmount, 1, mintAmount);
 
@@ -238,11 +230,7 @@ contract DubaiRealEstateTokenFuzzTest is Test {
      *         rounding dust). Each holder's claimable must be proportional
      *         to their balance.
      */
-    function testFuzz_DividendDistributionIsConsistent(
-        uint256 amount1,
-        uint256 amount2,
-        uint256 dividend
-    ) public {
+    function testFuzz_DividendDistributionIsConsistent(uint256 amount1, uint256 amount2, uint256 dividend) public {
         amount1 = bound(amount1, 1e18, token.MAX_SUPPLY() / 3);
         amount2 = bound(amount2, 1e18, token.MAX_SUPPLY() / 3);
         dividend = bound(dividend, 1e6, 1_000_000 * 1e6);
@@ -260,11 +248,7 @@ contract DubaiRealEstateTokenFuzzTest is Test {
 
         // Invariant 1: total claimable cannot exceed distributed amount
         // (rounding may create dust, but never more than dividend)
-        assertLe(
-            claimableAlice + claimableBob,
-            dividend,
-            "Total claimable exceeds distributed dividends"
-        );
+        assertLe(claimableAlice + claimableBob, dividend, "Total claimable exceeds distributed dividends");
 
         // Invariant 2: each holder has a positive claimable (if dividend > 0 and balance > 0)
         if (dividend > 0) {
@@ -320,10 +304,7 @@ contract DubaiRealEstateTokenFuzzTest is Test {
      * @notice After minting and burning random amounts across multiple
      *         holders, totalSupply must always equal the sum of balances.
      */
-    function testFuzz_SupplyConservation(
-        uint256[] calldata mintAmounts,
-        uint256[] calldata burnAmounts
-    ) public {
+    function testFuzz_SupplyConservation(uint256[] calldata mintAmounts, uint256[] calldata burnAmounts) public {
         vm.assume(mintAmounts.length > 0 && burnAmounts.length > 0);
         uint256 numHolders = bound(mintAmounts.length, 1, 20);
         address[] memory holders = new address[](numHolders);

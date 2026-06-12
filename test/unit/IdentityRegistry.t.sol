@@ -4,8 +4,8 @@ pragma solidity 0.8.28;
 import "forge-std/Test.sol";
 import "../../src/compliance/IdentityRegistry.sol";
 import "../../src/interfaces/IIdentityRegistry.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
+import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title MockIdentity
@@ -23,7 +23,6 @@ contract MockIdentity {
  *      they are allowed to buy tokenized real estate.
  */
 contract IdentityRegistryTest is Test {
-
     // ============================================
     // CONTRACTS UNDER TEST
     // ============================================
@@ -33,11 +32,11 @@ contract IdentityRegistryTest is Test {
     // ============================================
     // ACTORS (dummy addresses)
     // ============================================
-    address public admin;   // Project owner / chief notary
-    address public issuer;  // Authorized KYC officer
-    address public karim;   // Investor: Karim, UAE
-    address public bob;     // Investor: Bob, France
-    address public hacker;  // Malicious attacker
+    address public admin; // Project owner / chief notary
+    address public issuer; // Authorized KYC officer
+    address public karim; // Investor: Karim, UAE
+    address public bob; // Investor: Bob, France
+    address public hacker; // Malicious attacker
 
     // ============================================
     // CONSTANTS
@@ -65,10 +64,10 @@ contract IdentityRegistryTest is Test {
     // SETUP: Foundry runs this before EVERY test
     // ============================================
     function setUp() public {
-        admin  = makeAddr("admin");
+        admin = makeAddr("admin");
         issuer = makeAddr("issuer");
-        karim  = makeAddr("karim");
-        bob    = makeAddr("bob");
+        karim = makeAddr("karim");
+        bob = makeAddr("bob");
         hacker = makeAddr("hacker");
 
         vm.startPrank(admin);
@@ -91,18 +90,9 @@ contract IdentityRegistryTest is Test {
     // TEST 1: DEPLOYMENT — Are roles assigned correctly?
     // ============================================
     function test_DeploymentRoles() public view {
-        assertTrue(
-            registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), admin),
-            "Admin must hold DEFAULT_ADMIN_ROLE"
-        );
-        assertTrue(
-            registry.hasRole(registry.ISSUER_ROLE(), admin),
-            "Admin must hold ISSUER_ROLE"
-        );
-        assertTrue(
-            registry.hasRole(registry.ISSUER_ROLE(), issuer),
-            "Issuer must hold ISSUER_ROLE"
-        );
+        assertTrue(registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), admin), "Admin must hold DEFAULT_ADMIN_ROLE");
+        assertTrue(registry.hasRole(registry.ISSUER_ROLE(), admin), "Admin must hold ISSUER_ROLE");
+        assertTrue(registry.hasRole(registry.ISSUER_ROLE(), issuer), "Issuer must hold ISSUER_ROLE");
     }
 
     // ============================================
@@ -138,11 +128,7 @@ contract IdentityRegistryTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                issuerRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, issuerRole)
         );
 
         registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE);
@@ -172,10 +158,7 @@ contract IdentityRegistryTest is Test {
     function test_RegisterIdentity_InvalidCountry() public {
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__InvalidCountryCode.selector,
-                COUNTRY_INVALID
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__InvalidCountryCode.selector, COUNTRY_INVALID)
         );
         registry.registerIdentity(karim, address(mockIdentity), COUNTRY_INVALID);
     }
@@ -185,12 +168,7 @@ contract IdentityRegistryTest is Test {
     // ============================================
     function test_RegisterIdentity_EOARejected() public {
         vm.prank(issuer);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__InvalidIdentity.selector,
-                bob
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__InvalidIdentity.selector, bob));
         registry.registerIdentity(karim, bob, COUNTRY_UAE);
     }
 
@@ -203,10 +181,7 @@ contract IdentityRegistryTest is Test {
 
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__IdentityAlreadyExists.selector,
-                karim
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__IdentityAlreadyExists.selector, karim)
         );
         registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE);
     }
@@ -352,10 +327,7 @@ contract IdentityRegistryTest is Test {
 
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__KYCExpiryTooSoon.selector,
-                badExpiry
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__KYCExpiryTooSoon.selector, badExpiry)
         );
         registry.updateKYCExpiry(karim, badExpiry);
     }
@@ -382,11 +354,7 @@ contract IdentityRegistryTest is Test {
 
         vm.prank(hacker);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                hacker,
-                adminRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, hacker, adminRole)
         );
         registry.pause();
     }
@@ -473,7 +441,7 @@ contract IdentityRegistryTest is Test {
     // TEST 25: BATCH — Register multiple investors at once
     // ============================================
     function test_BatchRegisterIdentity() public {
-        address ali  = makeAddr("ali");
+        address ali = makeAddr("ali");
         address omar = makeAddr("omar");
         address sara = makeAddr("sara");
 
@@ -507,7 +475,9 @@ contract IdentityRegistryTest is Test {
         assertEq(registry.identity(ali), address(mockIdentity), "Ali identity correct");
         assertEq(registry.identity(sara), address(id3), "Sara identity correct");
         assertEq(registry.investorCountry(sara), COUNTRY_FRANCE, "Sara country correct");
-        assertEq(uint256(registry.investorType(ali)), uint256(IIdentityRegistry.InvestorType.Retail), "Ali type = Retail");
+        assertEq(
+            uint256(registry.investorType(ali)), uint256(IIdentityRegistry.InvestorType.Retail), "Ali type = Retail"
+        );
     }
 
     // ============================================
@@ -534,10 +504,7 @@ contract IdentityRegistryTest is Test {
     function test_DeleteIdentity_NotRegistered() public {
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__IdentityNotRegistered.selector,
-                karim
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__IdentityNotRegistered.selector, karim)
         );
         registry.deleteIdentity(karim);
     }
@@ -548,10 +515,7 @@ contract IdentityRegistryTest is Test {
     function test_UpdateIdentity_NotRegistered() public {
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__IdentityNotRegistered.selector,
-                karim
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__IdentityNotRegistered.selector, karim)
         );
         registry.updateIdentity(karim, address(mockIdentity));
     }
@@ -574,7 +538,11 @@ contract IdentityRegistryTest is Test {
 
         assertEq(registry.identity(karim), address(mockIdentity), "identity() getter");
         assertEq(registry.investorCountry(karim), COUNTRY_UAE, "investorCountry() getter");
-        assertEq(uint256(registry.investorType(karim)), uint256(IIdentityRegistry.InvestorType.Retail), "investorType() = Retail by default");
+        assertEq(
+            uint256(registry.investorType(karim)),
+            uint256(IIdentityRegistry.InvestorType.Retail),
+            "investorType() = Retail by default"
+        );
         assertEq(registry.kycExpiry(karim), block.timestamp + 365 days, "kycExpiry() = 1 year by default");
         assertTrue(registry.contains(karim), "contains() getter");
     }
@@ -602,10 +570,7 @@ contract IdentityRegistryTest is Test {
     function test_UpdateInvestorType_NotRegistered() public {
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__IdentityNotRegistered.selector,
-                karim
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__IdentityNotRegistered.selector, karim)
         );
         registry.updateInvestorType(karim, IIdentityRegistry.InvestorType.Accredited);
     }
@@ -616,10 +581,7 @@ contract IdentityRegistryTest is Test {
     function test_UpdateKYCExpiry_NotRegistered() public {
         vm.prank(issuer);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__IdentityNotRegistered.selector,
-                karim
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__IdentityNotRegistered.selector, karim)
         );
         registry.updateKYCExpiry(karim, block.timestamp + 30 days);
     }
@@ -669,10 +631,7 @@ contract IdentityRegistryTest is Test {
 
         vm.prank(admin);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__NotAuthorizedIssuer.selector,
-                randomIssuer
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__NotAuthorizedIssuer.selector, randomIssuer)
         );
         registry.removeTrustedIssuer(randomIssuer);
     }
@@ -690,10 +649,7 @@ contract IdentityRegistryTest is Test {
 
         vm.prank(admin);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__IdentityAlreadyExists.selector,
-                issuer1
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__IdentityAlreadyExists.selector, issuer1)
         );
         registry.addTrustedIssuer(issuer1, topics);
     }
@@ -732,10 +688,7 @@ contract IdentityRegistryTest is Test {
 
         vm.prank(admin);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__NotAuthorizedIssuer.selector,
-                issuer1
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__NotAuthorizedIssuer.selector, issuer1)
         );
         registry.updateTrustedIssuerClaimTopics(issuer1, topics);
     }
@@ -765,10 +718,7 @@ contract IdentityRegistryTest is Test {
 
         vm.prank(admin);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__IdentityNotRegistered.selector,
-                stranger
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__IdentityNotRegistered.selector, stranger)
         );
         registry.updateCountry(stranger, 250);
     }
@@ -788,12 +738,7 @@ contract IdentityRegistryTest is Test {
         }
 
         vm.prank(admin);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__BatchSizeExceeded.selector,
-                201
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__BatchSizeExceeded.selector, 201));
         registry.batchRegisterIdentity(investors, identities, countries);
     }
 
@@ -834,10 +779,7 @@ contract IdentityRegistryTest is Test {
 
         vm.prank(admin);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__InvalidIdentity.selector,
-                identities[1]
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__InvalidIdentity.selector, identities[1])
         );
         registry.batchRegisterIdentity(investors, identities, countries);
     }
@@ -858,12 +800,7 @@ contract IdentityRegistryTest is Test {
         countries[1] = 0;
 
         vm.prank(admin);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__InvalidCountryCode.selector,
-                0
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__InvalidCountryCode.selector, 0));
         registry.batchRegisterIdentity(investors, identities, countries);
     }
 
@@ -884,10 +821,7 @@ contract IdentityRegistryTest is Test {
 
         vm.prank(admin);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__IdentityAlreadyExists.selector,
-                investors[0]
-            )
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__IdentityAlreadyExists.selector, investors[0])
         );
         registry.batchRegisterIdentity(investors, identities, countries);
     }
@@ -896,7 +830,8 @@ contract IdentityRegistryTest is Test {
     // TEST 46: isVerifiedWithDetails — Unverified status
     // ============================================
     function test_IsVerifiedWithDetails_Unverified() public {
-        (IIdentityRegistry.VerificationStatus status, IIdentityRegistry.InvestorType invType) = registry.isVerifiedWithDetails(karim);
+        (IIdentityRegistry.VerificationStatus status, IIdentityRegistry.InvestorType invType) =
+            registry.isVerifiedWithDetails(karim);
         assertEq(uint256(status), uint256(IIdentityRegistry.VerificationStatus.Unverified));
         assertEq(uint256(invType), uint256(IIdentityRegistry.InvestorType.Retail));
     }
@@ -908,7 +843,8 @@ contract IdentityRegistryTest is Test {
         vm.prank(issuer);
         registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE);
 
-        (IIdentityRegistry.VerificationStatus status, IIdentityRegistry.InvestorType invType) = registry.isVerifiedWithDetails(karim);
+        (IIdentityRegistry.VerificationStatus status, IIdentityRegistry.InvestorType invType) =
+            registry.isVerifiedWithDetails(karim);
         assertEq(uint256(status), uint256(IIdentityRegistry.VerificationStatus.Verified));
         assertEq(uint256(invType), uint256(IIdentityRegistry.InvestorType.Retail));
     }
@@ -922,7 +858,8 @@ contract IdentityRegistryTest is Test {
 
         vm.warp(block.timestamp + 2 * 365 days);
 
-        (IIdentityRegistry.VerificationStatus status, IIdentityRegistry.InvestorType invType) = registry.isVerifiedWithDetails(karim);
+        (IIdentityRegistry.VerificationStatus status, IIdentityRegistry.InvestorType invType) =
+            registry.isVerifiedWithDetails(karim);
         assertEq(uint256(status), uint256(IIdentityRegistry.VerificationStatus.Expired));
         assertEq(uint256(invType), uint256(IIdentityRegistry.InvestorType.Retail));
     }
@@ -937,7 +874,7 @@ contract IdentityRegistryTest is Test {
         // Simulate identity contract destruction (code.length == 0)
         vm.etch(address(mockIdentity), "");
 
-        (IIdentityRegistry.VerificationStatus status, ) = registry.isVerifiedWithDetails(karim);
+        (IIdentityRegistry.VerificationStatus status,) = registry.isVerifiedWithDetails(karim);
         assertEq(uint256(status), uint256(IIdentityRegistry.VerificationStatus.Revoked));
     }
 
@@ -948,7 +885,9 @@ contract IdentityRegistryTest is Test {
         uint256 customExpiry = block.timestamp + 180 days;
 
         vm.prank(issuer);
-        registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE, IIdentityRegistry.InvestorType.Accredited, customExpiry);
+        registry.registerIdentity(
+            karim, address(mockIdentity), COUNTRY_UAE, IIdentityRegistry.InvestorType.Accredited, customExpiry
+        );
 
         assertTrue(registry.isVerified(karim));
         assertEq(uint256(registry.investorType(karim)), uint256(IIdentityRegistry.InvestorType.Accredited));
@@ -962,13 +901,10 @@ contract IdentityRegistryTest is Test {
         uint256 expiredExpiry = block.timestamp - 1;
 
         vm.prank(issuer);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__KYCExpired.selector,
-                karim
-            )
+        vm.expectRevert(abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__KYCExpired.selector, karim));
+        registry.registerIdentity(
+            karim, address(mockIdentity), COUNTRY_UAE, IIdentityRegistry.InvestorType.Accredited, expiredExpiry
         );
-        registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE, IIdentityRegistry.InvestorType.Accredited, expiredExpiry);
     }
 
     // ============================================
@@ -1081,12 +1017,7 @@ contract IdentityRegistryTest is Test {
         registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE);
 
         vm.prank(issuer);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__InvalidIdentity.selector,
-                bob
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__InvalidIdentity.selector, bob));
         registry.updateIdentity(karim, bob);
     }
 
@@ -1170,12 +1101,7 @@ contract IdentityRegistryTest is Test {
     // ============================================
     function test_RegisterIdentity_CountryOver999() public {
         vm.prank(issuer);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__InvalidCountryCode.selector,
-                1000
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__InvalidCountryCode.selector, 1000));
         registry.registerIdentity(karim, address(mockIdentity), 1000);
     }
 
@@ -1195,12 +1121,7 @@ contract IdentityRegistryTest is Test {
         countries[1] = 1000;
 
         vm.prank(admin);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IIdentityRegistry.IIdentityRegistry__InvalidCountryCode.selector,
-                1000
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__InvalidCountryCode.selector, 1000));
         registry.batchRegisterIdentity(investors, identities, countries);
     }
 
@@ -1240,14 +1161,25 @@ contract IdentityRegistryTest is Test {
 
     function test_RegisterIdentityOverload_Duplicate_CoverageWorkaround() public {
         vm.prank(issuer);
-        registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE, IIdentityRegistry.InvestorType.Accredited, block.timestamp + 365 days);
+        registry.registerIdentity(
+            karim,
+            address(mockIdentity),
+            COUNTRY_UAE,
+            IIdentityRegistry.InvestorType.Accredited,
+            block.timestamp + 365 days
+        );
 
         vm.prank(issuer);
-        try registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE, IIdentityRegistry.InvestorType.Accredited, block.timestamp + 365 days) {
+        try registry.registerIdentity(
+            karim,
+            address(mockIdentity),
+            COUNTRY_UAE,
+            IIdentityRegistry.InvestorType.Accredited,
+            block.timestamp + 365 days
+        ) {
             assertTrue(false, "Should revert");
         } catch {
             // branch covered
         }
     }
-
 }

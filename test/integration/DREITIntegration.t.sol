@@ -42,12 +42,7 @@ contract DREITIntegrationTest is Test {
         registry = new IdentityRegistry(admin);
         compliance = new ComplianceEngine(admin, address(registry));
         token = new DubaiRealEstateToken(
-            address(usdc),
-            address(registry),
-            address(compliance),
-            "Dubai Real Estate",
-            "DREIT",
-            admin
+            address(usdc), address(registry), address(compliance), "Dubai Real Estate", "DREIT", admin
         );
         compliance.bindToken(address(token));
 
@@ -64,7 +59,9 @@ contract DREITIntegrationTest is Test {
     function _registerKYC(address investor) internal {
         address mockIdentity = address(new MockIdentity());
         vm.prank(issuer);
-        registry.registerIdentity(investor, mockIdentity, COUNTRY_UAE, IIdentityRegistry.InvestorType.Retail, block.timestamp + 365 days);
+        registry.registerIdentity(
+            investor, mockIdentity, COUNTRY_UAE, IIdentityRegistry.InvestorType.Retail, block.timestamp + 365 days
+        );
     }
 
     // ============================================

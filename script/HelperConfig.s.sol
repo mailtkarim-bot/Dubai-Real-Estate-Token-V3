@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Script} from "forge-std/Script.sol";
+import { Script } from "forge-std/Script.sol";
 
 /**
  * @title HelperConfig
@@ -9,7 +9,6 @@ import {Script} from "forge-std/Script.sol";
  * @dev Returns the correct USDC address and deployer key based on the chain.
  */
 abstract contract HelperConfig is Script {
-
     struct NetworkConfig {
         address usdc;
         uint256 deployerKey;
@@ -28,10 +27,7 @@ abstract contract HelperConfig is Script {
         } else if (block.chainid == 1) {
             return _getMainnetConfig();
         } else {
-            revert(string.concat(
-                "HelperConfig: Unsupported chain ",
-                vm.toString(block.chainid)
-            ));
+            revert(string.concat("HelperConfig: Unsupported chain ", vm.toString(block.chainid)));
         }
     }
 
@@ -43,16 +39,10 @@ abstract contract HelperConfig is Script {
     }
 
     function _getSepoliaConfig() internal view returns (NetworkConfig memory) {
-        return NetworkConfig({
-            usdc: USDC_SEPOLIA,
-            deployerKey: vm.envUint("PRIVATE_KEY")
-        });
+        return NetworkConfig({ usdc: USDC_SEPOLIA, deployerKey: vm.envUint("PRIVATE_KEY") });
     }
 
     function _getMainnetConfig() internal view returns (NetworkConfig memory) {
-        return NetworkConfig({
-            usdc: USDC_MAINNET,
-            deployerKey: vm.envUint("PRIVATE_KEY")
-        });
+        return NetworkConfig({ usdc: USDC_MAINNET, deployerKey: vm.envUint("PRIVATE_KEY") });
     }
 }

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import {Script, console2} from "forge-std/Script.sol";
-import {TimelockController} from "@openzeppelin/contracts/governance/TimelockController.sol";
-import {HelperConfig} from "../HelperConfig.s.sol";
-import {IdentityRegistry} from "../../src/compliance/IdentityRegistry.sol";
-import {ComplianceEngine} from "../../src/compliance/ComplianceEngine.sol";
-import {DubaiRealEstateToken} from "../../src/core/DubaiRealEstateToken.sol";
+import { Script, console2 } from "forge-std/Script.sol";
+import { TimelockController } from "@openzeppelin/contracts/governance/TimelockController.sol";
+import { HelperConfig } from "../HelperConfig.s.sol";
+import { IdentityRegistry } from "../../src/compliance/IdentityRegistry.sol";
+import { ComplianceEngine } from "../../src/compliance/ComplianceEngine.sol";
+import { DubaiRealEstateToken } from "../../src/core/DubaiRealEstateToken.sol";
 
 /**
  * @title DeployMainnet
@@ -49,12 +49,7 @@ contract DeployMainnet is Script, HelperConfig {
 
         // 4. DubaiRealEstateToken (admin = timelock)
         DubaiRealEstateToken token = new DubaiRealEstateToken(
-            usdc,
-            address(registry),
-            address(compliance),
-            "Dubai Real Estate",
-            "DREIT",
-            address(timelock)
+            usdc, address(registry), address(compliance), "Dubai Real Estate", "DREIT", address(timelock)
         );
         console2.log("DubaiRealEstateToken:", address(token));
 
@@ -74,13 +69,27 @@ contract DeployMainnet is Script, HelperConfig {
 
         // Persist
         string memory json = string.concat(
-            '{"chainId":"', vm.toString(block.chainid), '",',
-            '"deployer":"', vm.toString(deployer), '",',
-            '"timelock":"', vm.toString(address(timelock)), '",',
-            '"usdc":"', vm.toString(usdc), '",',
-            '"registry":"', vm.toString(address(registry)), '",',
-            '"compliance":"', vm.toString(address(compliance)), '",',
-            '"token":"', vm.toString(address(token)), '"}'
+            '{"chainId":"',
+            vm.toString(block.chainid),
+            '",',
+            '"deployer":"',
+            vm.toString(deployer),
+            '",',
+            '"timelock":"',
+            vm.toString(address(timelock)),
+            '",',
+            '"usdc":"',
+            vm.toString(usdc),
+            '",',
+            '"registry":"',
+            vm.toString(address(registry)),
+            '",',
+            '"compliance":"',
+            vm.toString(address(compliance)),
+            '",',
+            '"token":"',
+            vm.toString(address(token)),
+            '"}'
         );
         vm.createDir("./deployments", true);
         vm.writeFile("./deployments/mainnet.json", json);
