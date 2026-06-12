@@ -41,3 +41,5 @@ docs/*
 
 # Dependencies (install with forge install)
 lib/
+frontend/node_modules/
+frontend/dist/
