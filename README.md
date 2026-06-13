@@ -182,7 +182,7 @@ During development, the following issues were identified and corrected in the co
 ## 🏗️ Technical Architecture
 
 ```
-dubai-real-estate-v2/
+Dubai-Real-Estate-Token-V3/
 ├── 📁 src/                                     # Solidity smart contracts
 │   ├── core/
 │   │   └── DubaiRealEstateToken.sol          # ERC-3643 T-REX token + dividends
@@ -382,8 +382,8 @@ Coverage excludes deployment scripts and test files. Core contract coverage:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/mailtkarim-bot/dubai-real-estate-v2.git
-cd dubai-real-estate-v2
+git clone https://github.com/mailtkarim-bot/Dubai-Real-Estate-Token-V3.git
+cd Dubai-Real-Estate-Token-V3
 
 # 2. Install Foundry dependencies
 forge install
