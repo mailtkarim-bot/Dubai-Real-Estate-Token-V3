@@ -7,6 +7,7 @@ import "../../src/compliance/IdentityRegistry.sol";
 import "../../src/interfaces/IIdentityRegistry.sol";
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * @title MockIdentity
@@ -29,6 +30,7 @@ contract ComplianceEngineTest is Test {
     ComplianceEngine public compliance;
     IdentityRegistry public registry;
     MockIdentity public mockIdentity;
+    address public boundToken; // Bound token for hook access-control tests
 
     // ============================================
     // ACTORS
@@ -57,6 +59,7 @@ contract ComplianceEngineTest is Test {
     event WhitelistEnabled(bool enabled, uint256 timestamp, address indexed actor);
     event WhitelistUpdated(address indexed account, bool status, address indexed actor);
     event IdentityRegistrySet(address indexed registry);
+    event ModuleRemoved(address indexed module);
 
     // ============================================
     // SETUP
@@ -69,27 +72,48 @@ contract ComplianceEngineTest is Test {
         bob = makeAddr("bob");
         ali = makeAddr("ali");
 
-        // Deploy IdentityRegistry
-        vm.startPrank(admin);
-        registry = new IdentityRegistry(admin);
-        registry.grantRole(registry.ISSUER_ROLE(), admin);
-        vm.stopPrank();
+        // Deploy IdentityRegistry proxy
+        registry = _deployRegistry(admin);
 
-        // Deploy ComplianceEngine linked to Registry
+        // Deploy ComplianceEngine proxy linked to Registry
+        compliance = _deployCompliance(admin, address(registry));
+
         vm.startPrank(admin);
-        compliance = new ComplianceEngine(admin, address(registry));
+        registry.grantRole(registry.ISSUER_ROLE(), admin);
         compliance.grantRole(compliance.REGULATOR_ROLE(), regulator);
         vm.stopPrank();
 
-        // Deploy mock identity
+        // Deploy mock identities — each investor must have a unique identity contract.
         mockIdentity = new MockIdentity();
+        MockIdentity mockIdentityKarim = new MockIdentity();
+        MockIdentity mockIdentityBob = new MockIdentity();
+        MockIdentity mockIdentityAli = new MockIdentity();
 
         // Register investors in IdentityRegistry (needed for compliance checks)
         vm.startPrank(admin);
-        registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE);
-        registry.registerIdentity(bob, address(mockIdentity), COUNTRY_FRANCE);
-        registry.registerIdentity(ali, address(mockIdentity), COUNTRY_IRAN);
+        registry.registerIdentity(karim, address(mockIdentityKarim), COUNTRY_UAE);
+        registry.registerIdentity(bob, address(mockIdentityBob), COUNTRY_FRANCE);
+        registry.registerIdentity(ali, address(mockIdentityAli), COUNTRY_IRAN);
+
+        // Bind a dummy token so stateful compliance hooks can only be called by the token.
+        boundToken = makeAddr("token");
+        compliance.bindToken(boundToken);
         vm.stopPrank();
+    }
+
+    function _deployRegistry(address _admin) internal returns (IdentityRegistry) {
+        IdentityRegistry impl = new IdentityRegistry();
+        ERC1967Proxy proxy =
+            new ERC1967Proxy(address(impl), abi.encodeWithSelector(IdentityRegistry.initialize.selector, _admin));
+        return IdentityRegistry(address(proxy));
+    }
+
+    function _deployCompliance(address _admin, address _registry) internal returns (ComplianceEngine) {
+        ComplianceEngine impl = new ComplianceEngine();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl), abi.encodeWithSelector(ComplianceEngine.initialize.selector, _admin, _registry)
+        );
+        return ComplianceEngine(address(proxy));
     }
 
     // ============================================
@@ -280,6 +304,19 @@ contract ComplianceEngineTest is Test {
     }
 
     // ============================================
+    // TEST 17b: COUNTRY INPUT — Invalid country code reverts
+    // ============================================
+    function test_RestrictCountry_InvalidCountryCode() public {
+        vm.prank(regulator);
+        vm.expectRevert(abi.encodeWithSelector(ComplianceEngine.ComplianceEngine__InvalidCountryCode.selector, 0));
+        compliance.restrictCountry(0);
+
+        vm.prank(regulator);
+        vm.expectRevert(abi.encodeWithSelector(ComplianceEngine.ComplianceEngine__InvalidCountryCode.selector, 1000));
+        compliance.restrictCountry(1000);
+    }
+
+    // ============================================
     // TEST 18: WHITELIST — Whitelist mode blocks non-whitelisted
     // ============================================
     function test_IsCompliant_WhitelistBlocksNonWhitelisted() public {
@@ -295,19 +332,32 @@ contract ComplianceEngineTest is Test {
     }
 
     // ============================================
-    // TEST 19: WHITELIST — Whitelisted investor allowed
+    // TEST 19: WHITELIST — Both parties must be whitelisted
     // ============================================
     function test_IsCompliant_WhitelistedAllowed() public {
+        vm.prank(admin);
+        compliance.setWhitelistEnabled(true);
+
+        vm.startPrank(regulator);
+        compliance.setWhitelisted(karim, true);
+        compliance.setWhitelisted(bob, true);
+        vm.stopPrank();
+
+        assertTrue(compliance.isWhitelisted(karim), "Karim must be whitelisted");
+        assertTrue(compliance.isWhitelisted(bob), "Bob must be whitelisted");
+
+        bool result = compliance.isCompliant(bob, karim, 100e18);
+        assertTrue(result, "Whitelisted sender and recipient must be allowed");
+    }
+
+    function test_IsCompliant_NonWhitelistedSenderReverts() public {
         vm.prank(admin);
         compliance.setWhitelistEnabled(true);
 
         vm.prank(regulator);
         compliance.setWhitelisted(karim, true);
 
-        assertTrue(compliance.isWhitelisted(karim), "Karim must be whitelisted");
-
-        bool result = compliance.isCompliant(bob, karim, 100e18);
-        assertTrue(result, "Whitelisted to must be allowed");
+        assertFalse(compliance.isCompliant(bob, karim, 100e18), "Non-whitelisted sender must be blocked");
     }
 
     // ============================================
@@ -382,10 +432,10 @@ contract ComplianceEngineTest is Test {
     // TEST 25: REGISTRY LINK — Admin can set new registry
     // ============================================
     function test_SetIdentityRegistry_ByAdmin() public {
-        address newRegistry = makeAddr("newRegistry");
+        // Deploy a dummy contract; setIdentityRegistry now requires a contract address.
+        MockIdentity newRegistryContract = new MockIdentity();
+        address newRegistry = address(newRegistryContract);
 
-        // Deploy a dummy contract at that address so nonZeroAddress passes
-        // For test purposes we just need any non-zero address with code
         vm.expectEmit(true, false, false, false);
         emit IdentityRegistrySet(newRegistry);
 
@@ -416,6 +466,17 @@ contract ComplianceEngineTest is Test {
         vm.prank(admin);
         vm.expectRevert(ComplianceEngine.ComplianceEngine__ZeroAddress.selector);
         compliance.setIdentityRegistry(address(0));
+    }
+
+    // ============================================
+    // TEST 27b: REGISTRY LINK — EOA address reverts
+    // ============================================
+    function test_SetIdentityRegistry_NotContract() public {
+        address eoaRegistry = makeAddr("eoaRegistry");
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(ComplianceEngine.ComplianceEngine__NotContract.selector, eoaRegistry));
+        compliance.setIdentityRegistry(eoaRegistry);
     }
 
     // ============================================
@@ -553,42 +614,64 @@ contract ComplianceEngineTest is Test {
     }
 
     // ============================================
-    // TEST 38: CONSTRUCTOR — Zero address admin reverts
+    // TEST 38: INITIALIZE — Zero address admin reverts
     // ============================================
-    function test_Constructor_ZeroAddressAdmin() public {
+    function test_Initialize_ZeroAddressAdmin() public {
+        ComplianceEngine impl = new ComplianceEngine();
         vm.expectRevert(ComplianceEngine.ComplianceEngine__ZeroAddress.selector);
-        new ComplianceEngine(address(0), address(registry));
+        new ERC1967Proxy(
+            address(impl), abi.encodeWithSelector(ComplianceEngine.initialize.selector, address(0), address(registry))
+        );
     }
 
     // ============================================
-    // TEST 39: CONSTRUCTOR — Zero address registry reverts
+    // TEST 39: INITIALIZE — Zero address registry reverts
     // ============================================
-    function test_Constructor_ZeroAddressRegistry() public {
+    function test_Initialize_ZeroAddressRegistry() public {
+        ComplianceEngine impl = new ComplianceEngine();
         vm.expectRevert(ComplianceEngine.ComplianceEngine__ZeroAddress.selector);
-        new ComplianceEngine(admin, address(0));
+        new ERC1967Proxy(address(impl), abi.encodeWithSelector(ComplianceEngine.initialize.selector, admin, address(0)));
     }
 
     // ============================================
-    // TEST 40: transferred hook (stub) — does not revert
+    // TEST 40: transferred hook — only bound token can call
     // ============================================
-    function test_TransferredHook() public {
+    function test_TransferredHook_ByToken() public {
+        vm.prank(boundToken);
+        compliance.transferred(karim, bob, 100e18);
+    }
+
+    function test_TransferredHook_ByNonTokenReverts() public {
         vm.prank(admin);
+        vm.expectRevert(ComplianceEngine.ComplianceEngine__NotToken.selector);
         compliance.transferred(karim, bob, 100e18);
     }
 
     // ============================================
-    // TEST 41: created hook (stub) — does not revert
+    // TEST 41: created hook — only bound token can call
     // ============================================
-    function test_CreatedHook() public {
+    function test_CreatedHook_ByToken() public {
+        vm.prank(boundToken);
+        compliance.created(bob, 100e18);
+    }
+
+    function test_CreatedHook_ByNonTokenReverts() public {
         vm.prank(admin);
+        vm.expectRevert(ComplianceEngine.ComplianceEngine__NotToken.selector);
         compliance.created(bob, 100e18);
     }
 
     // ============================================
-    // TEST 42: destroyed hook (stub) — does not revert
+    // TEST 42: destroyed hook — only bound token can call
     // ============================================
-    function test_DestroyedHook() public {
+    function test_DestroyedHook_ByToken() public {
+        vm.prank(boundToken);
+        compliance.destroyed(karim, 100e18);
+    }
+
+    function test_DestroyedHook_ByNonTokenReverts() public {
         vm.prank(admin);
+        vm.expectRevert(ComplianceEngine.ComplianceEngine__NotToken.selector);
         compliance.destroyed(karim, 100e18);
     }
 
@@ -596,9 +679,9 @@ contract ComplianceEngineTest is Test {
     // TEST 43: unbindToken — mismatch reverts with TokenMismatch
     // ============================================
     function test_UnbindToken_MismatchReverts() public {
-        address tokenAddr = makeAddr("token");
+        address anotherTokenAddr = makeAddr("anotherToken");
         vm.prank(admin);
-        compliance.bindToken(tokenAddr);
+        compliance.bindToken(anotherTokenAddr);
 
         vm.prank(admin);
         vm.expectRevert(ComplianceEngine.ComplianceEngine__TokenMismatch.selector);
@@ -627,5 +710,137 @@ contract ComplianceEngineTest is Test {
         vm.prank(admin);
         vm.expectRevert(ComplianceEngine.ComplianceEngine__ZeroAddress.selector);
         compliance.bindToken(address(0));
+    }
+
+    // ============================================
+    // TEST 47: removeModule — Admin can call stub
+    // ============================================
+    function test_RemoveModule() public {
+        address module = makeAddr("module");
+
+        vm.expectEmit(true, false, false, false);
+        emit ModuleRemoved(module);
+
+        vm.prank(admin);
+        compliance.removeModule(module);
+    }
+
+    // ============================================
+    // TEST 48: COUNTRY — Sender country restricted
+    // ============================================
+    function test_IsCompliant_CountryRestrictedFrom() public {
+        vm.prank(regulator);
+        compliance.restrictCountry(COUNTRY_IRAN);
+
+        address reza = makeAddr("reza");
+        MockIdentity rezaIdentity = new MockIdentity();
+        vm.prank(admin);
+        registry.registerIdentity(reza, address(rezaIdentity), COUNTRY_IRAN);
+
+        assertFalse(compliance.isCompliant(reza, karim, 100e18), "Restricted sender must be blocked");
+    }
+
+    // ============================================
+    // TEST 49: COUNTRY — Recipient country restricted
+    // ============================================
+    function test_IsCompliant_CountryRestrictedTo() public {
+        vm.prank(regulator);
+        compliance.restrictCountry(COUNTRY_IRAN);
+
+        address reza = makeAddr("reza");
+        MockIdentity rezaIdentity = new MockIdentity();
+        vm.prank(admin);
+        registry.registerIdentity(reza, address(rezaIdentity), COUNTRY_IRAN);
+
+        assertFalse(compliance.isCompliant(karim, reza, 100e18), "Restricted recipient must be blocked");
+    }
+
+    // ============================================
+    // TEST 50: COUNTRY — canDestroy blocks restricted sender country
+    // ============================================
+    function test_CanDestroy_CountryRestrictedFrom() public {
+        vm.prank(regulator);
+        compliance.restrictCountry(COUNTRY_IRAN);
+
+        address reza = makeAddr("reza");
+        MockIdentity rezaIdentity = new MockIdentity();
+        vm.prank(admin);
+        registry.registerIdentity(reza, address(rezaIdentity), COUNTRY_IRAN);
+
+        assertFalse(compliance.canDestroy(reza, 100e18), "Restricted sender must not be allowed to burn");
+    }
+
+    // ============================================
+    // TEST 51: COUNTRY — canCreate blocks restricted recipient country
+    // ============================================
+    function test_CanCreate_CountryRestrictedTo() public {
+        vm.prank(regulator);
+        compliance.restrictCountry(COUNTRY_IRAN);
+
+        address reza = makeAddr("reza");
+        MockIdentity rezaIdentity = new MockIdentity();
+        vm.prank(admin);
+        registry.registerIdentity(reza, address(rezaIdentity), COUNTRY_IRAN);
+
+        assertFalse(compliance.canCreate(reza, 100e18), "Restricted recipient must not be allowed to mint");
+    }
+
+    // ============================================
+    // TEST 52: PAUSE — Emits Paused event
+    // ============================================
+    function test_Pause_EmitsEvent() public {
+        vm.expectEmit(false, false, false, true);
+        emit Pausable.Paused(admin);
+
+        vm.prank(admin);
+        compliance.pause();
+    }
+
+    // ============================================
+    // TEST 53: UNPAUSE — Emits Unpaused event
+    // ============================================
+    function test_Unpause_EmitsEvent() public {
+        vm.prank(admin);
+        compliance.pause();
+
+        vm.expectEmit(false, false, false, true);
+        emit Pausable.Unpaused(admin);
+
+        vm.prank(admin);
+        compliance.unpause();
+    }
+
+    // ============================================
+    // TEST 54: CONSTRUCTOR — Disable initializers on implementation
+    // ============================================
+    function test_Constructor_DisableInitializers() public {
+        ComplianceEngine impl = new ComplianceEngine();
+        // After construction, the implementation must have no pending initializer.
+        // Re-initializing it should revert because initializers are disabled.
+        vm.expectRevert();
+        impl.initialize(admin, address(registry));
+    }
+
+    // ============================================
+    // TEST 55: WORKAROUND — validCountry modifier branch via try/catch
+    // ============================================
+    function test_ValidCountryModifier_CoverageWorkaround() public {
+        vm.prank(regulator);
+        try compliance.restrictCountry(0) {
+            assertTrue(false, "Should revert");
+        } catch {
+            // branch covered
+        }
+    }
+
+    // ============================================
+    // TEST 56: WHITELIST — canDestroy blocks non-whitelisted sender
+    // ============================================
+    function test_CanDestroy_WhitelistBlocksNonWhitelisted() public {
+        vm.prank(admin);
+        compliance.setWhitelistEnabled(true);
+
+        // Karim is not whitelisted
+        assertFalse(compliance.canDestroy(karim, 100e18), "Non-whitelisted sender must not be allowed to burn");
     }
 }

@@ -3,19 +3,26 @@ pragma solidity 0.8.28;
 
 import { IComplianceEngine } from "../interfaces/IComplianceEngine.sol";
 import { IIdentityRegistry } from "../interfaces/IIdentityRegistry.sol";
-import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
-import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 /**
  * @title ComplianceEngine
  * @author Steph Rayan
- * @notice Regulatory compliance engine enforcing VARA/DLD rules — v2.1.
+ * @notice UUPS upgradeable regulatory compliance engine enforcing VARA/DLD rules — v3.0.
  * @custom:security Educational / portfolio project. Internal review only. No external audit.
  *      Not production-ready without a Tier-1 audit, legal opinion and regulated entity.
- * @dev v2 adds stateful hooks for modular compliance tracking.
- *      Production modular compliance (IModule pattern) planned for Phase 2.
+ * @dev v3 is UUPS upgradeable. Stateful hooks for modular compliance tracking planned for Phase 2.
  */
-contract ComplianceEngine is IComplianceEngine, AccessControl, Pausable {
+contract ComplianceEngine is
+    IComplianceEngine,
+    Initializable,
+    AccessControlUpgradeable,
+    PausableUpgradeable,
+    UUPSUpgradeable
+{
     bytes32 public constant REGULATOR_ROLE = keccak256("REGULATOR_ROLE");
 
     address public token;
@@ -36,16 +43,39 @@ contract ComplianceEngine is IComplianceEngine, AccessControl, Pausable {
 
     error ComplianceEngine__ZeroAddress();
     error ComplianceEngine__TokenMismatch();
+    error ComplianceEngine__NotToken();
+    error ComplianceEngine__NotContract(address addr);
+    error ComplianceEngine__InvalidCountryCode(uint16 country);
 
     modifier nonZeroAddress(address addr) {
         if (addr == address(0)) revert ComplianceEngine__ZeroAddress();
         _;
     }
 
-    constructor(address admin, address identityRegistryAddr)
+    modifier onlyToken() {
+        if (msg.sender != token) revert ComplianceEngine__NotToken();
+        _;
+    }
+
+    modifier validCountry(uint16 country) {
+        if (country == 0 || country > 999) revert ComplianceEngine__InvalidCountryCode(country);
+        _;
+    }
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address admin, address identityRegistryAddr)
+        external
+        initializer
         nonZeroAddress(admin)
         nonZeroAddress(identityRegistryAddr)
     {
+        __AccessControl_init();
+        __Pausable_init();
+
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(REGULATOR_ROLE, admin);
         identityRegistry = IIdentityRegistry(identityRegistryAddr);
@@ -92,7 +122,10 @@ contract ComplianceEngine is IComplianceEngine, AccessControl, Pausable {
             if (_restrictedCountries[toCountry]) return false;
         }
 
-        if (to != address(0) && whitelistEnabled && !_whitelisted[to]) return false;
+        if (whitelistEnabled) {
+            if (from != address(0) && !_whitelisted[from]) return false;
+            if (to != address(0) && !_whitelisted[to]) return false;
+        }
 
         return true;
     }
@@ -106,8 +139,10 @@ contract ComplianceEngine is IComplianceEngine, AccessControl, Pausable {
     )
         external
         override
+        onlyToken
     {
         // Phase 2: Modular compliance tracking (daily limits, counters, etc.)
+        // Only the bound token may call this hook to prevent state manipulation.
     }
 
     function created(
@@ -117,8 +152,10 @@ contract ComplianceEngine is IComplianceEngine, AccessControl, Pausable {
     )
         external
         override
+        onlyToken
     {
         // Phase 2: Modular compliance tracking
+        // Only the bound token may call this hook to prevent state manipulation.
     }
 
     function destroyed(
@@ -128,8 +165,10 @@ contract ComplianceEngine is IComplianceEngine, AccessControl, Pausable {
     )
         external
         override
+        onlyToken
     {
         // Phase 2: Modular compliance tracking
+        // Only the bound token may call this hook to prevent state manipulation.
     }
 
     function freezeInvestor(address investor, string calldata reason) external onlyRole(REGULATOR_ROLE) {
@@ -146,12 +185,12 @@ contract ComplianceEngine is IComplianceEngine, AccessControl, Pausable {
         return _frozen[investor];
     }
 
-    function restrictCountry(uint16 country) external onlyRole(REGULATOR_ROLE) {
+    function restrictCountry(uint16 country) external onlyRole(REGULATOR_ROLE) validCountry(country) {
         _restrictedCountries[country] = true;
         emit CountryRestricted(country, block.timestamp, msg.sender);
     }
 
-    function unrestrictCountry(uint16 country) external onlyRole(REGULATOR_ROLE) {
+    function unrestrictCountry(uint16 country) external onlyRole(REGULATOR_ROLE) validCountry(country) {
         _restrictedCountries[country] = false;
         emit CountryUnrestricted(country, block.timestamp, msg.sender);
     }
@@ -175,6 +214,7 @@ contract ComplianceEngine is IComplianceEngine, AccessControl, Pausable {
     }
 
     function setIdentityRegistry(address registry) external onlyRole(DEFAULT_ADMIN_ROLE) nonZeroAddress(registry) {
+        if (registry.code.length == 0) revert ComplianceEngine__NotContract(registry);
         identityRegistry = IIdentityRegistry(registry);
         emit IdentityRegistrySet(registry);
     }
@@ -218,4 +258,15 @@ contract ComplianceEngine is IComplianceEngine, AccessControl, Pausable {
     function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {
+        // Upgrade authorization restricted to admin (TimelockController in production).
+        (newImplementation);
+    }
+
+    /**
+     * @dev Reserved storage slots for future upgrades.
+     *      Do NOT remove or modify. New variables must be added above this gap.
+     */
+    uint256[50] private __gap;
 }

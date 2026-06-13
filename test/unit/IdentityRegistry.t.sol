@@ -4,8 +4,11 @@ pragma solidity 0.8.28;
 import "forge-std/Test.sol";
 import "../../src/compliance/IdentityRegistry.sol";
 import "../../src/interfaces/IIdentityRegistry.sol";
+import { IDividendAware } from "../../src/interfaces/IDividendAware.sol";
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
  * @title MockIdentity
@@ -14,6 +17,40 @@ import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
  */
 contract MockIdentity {
     // Intentionally empty. Its existence at an address is sufficient.
+}
+
+/**
+ * @title MockDividendToken
+ * @notice Minimal token stub so deleteIdentity can query balance and pending dividends.
+ */
+contract MockDividendToken is IERC20, IDividendAware {
+    function balanceOf(address) external pure returns (uint256) {
+        return 0;
+    }
+
+    function pendingDividendsOf(address) external pure returns (uint256) {
+        return 0;
+    }
+
+    function totalSupply() external pure returns (uint256) {
+        return 0;
+    }
+
+    function allowance(address, address) external pure returns (uint256) {
+        return 0;
+    }
+
+    function approve(address, uint256) external pure returns (bool) {
+        return true;
+    }
+
+    function transfer(address, uint256) external pure returns (bool) {
+        return true;
+    }
+
+    function transferFrom(address, address, uint256) external pure returns (bool) {
+        return true;
+    }
 }
 
 /**
@@ -28,6 +65,7 @@ contract IdentityRegistryTest is Test {
     // ============================================
     IdentityRegistry public registry;
     MockIdentity public mockIdentity;
+    MockDividendToken public mockToken;
 
     // ============================================
     // ACTORS (dummy addresses)
@@ -56,6 +94,7 @@ contract IdentityRegistryTest is Test {
     event TrustedIssuerAdded(address indexed trustedIssuer, uint256[] claimTopics, address indexed actor);
     event TrustedIssuerRemoved(address indexed trustedIssuer, address indexed actor);
     event TrustedIssuerClaimTopicsUpdated(address indexed trustedIssuer, uint256[] claimTopics, address indexed actor);
+    event TokenSet(address indexed oldToken, address indexed newToken);
     event IdentityRegistryStorageSet(address indexed identityRegistryStorage);
     event ClaimTopicsRegistrySet(address indexed claimTopicsRegistry);
     event TrustedIssuersRegistrySet(address indexed trustedIssuersRegistry);
@@ -70,20 +109,32 @@ contract IdentityRegistryTest is Test {
         bob = makeAddr("bob");
         hacker = makeAddr("hacker");
 
+        registry = _deployRegistry(admin);
+        mockToken = new MockDividendToken();
+
         vm.startPrank(admin);
-        registry = new IdentityRegistry(admin);
         registry.grantRole(registry.ISSUER_ROLE(), issuer);
+        registry.setToken(address(mockToken));
         vm.stopPrank();
 
         mockIdentity = new MockIdentity();
     }
 
+    function _deployRegistry(address _admin) internal returns (IdentityRegistry) {
+        IdentityRegistry impl = new IdentityRegistry();
+        ERC1967Proxy proxy =
+            new ERC1967Proxy(address(impl), abi.encodeWithSelector(IdentityRegistry.initialize.selector, _admin));
+        return IdentityRegistry(address(proxy));
+    }
+
     // ============================================
     // TEST 0: DEPLOYMENT — Zero address admin reverts
     // ============================================
-    function test_Constructor_ZeroAddressAdmin() public {
+    function test_Initialize_ZeroAddressAdmin() public {
+        IdentityRegistry impl = new IdentityRegistry();
+
         vm.expectRevert(IIdentityRegistry.IIdentityRegistry__ZeroAddress.selector);
-        new IdentityRegistry(address(0));
+        new ERC1967Proxy(address(impl), abi.encodeWithSelector(IdentityRegistry.initialize.selector, address(0)));
     }
 
     // ============================================
@@ -93,6 +144,20 @@ contract IdentityRegistryTest is Test {
         assertTrue(registry.hasRole(registry.DEFAULT_ADMIN_ROLE(), admin), "Admin must hold DEFAULT_ADMIN_ROLE");
         assertTrue(registry.hasRole(registry.ISSUER_ROLE(), admin), "Admin must hold ISSUER_ROLE");
         assertTrue(registry.hasRole(registry.ISSUER_ROLE(), issuer), "Issuer must hold ISSUER_ROLE");
+    }
+
+    // ============================================
+    // TEST 1b: EVENT — TokenSet emitted on setToken
+    // ============================================
+    function test_SetToken_EmitsEvent() public {
+        IdentityRegistry freshRegistry = _deployRegistry(admin);
+        MockDividendToken newToken = new MockDividendToken();
+
+        vm.expectEmit(true, true, false, false);
+        emit TokenSet(address(0), address(newToken));
+
+        vm.prank(admin);
+        freshRegistry.setToken(address(newToken));
     }
 
     // ============================================
@@ -187,6 +252,24 @@ contract IdentityRegistryTest is Test {
     }
 
     // ============================================
+    // TEST 9b: STATE — Same identity contract assigned to two investors rejected
+    // ============================================
+    function test_RegisterIdentity_DuplicateIdentityContract() public {
+        vm.prank(issuer);
+        registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE);
+
+        vm.prank(issuer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IIdentityRegistry.IIdentityRegistry__IdentityContractAlreadyAssigned.selector,
+                address(mockIdentity),
+                karim
+            )
+        );
+        registry.registerIdentity(bob, address(mockIdentity), COUNTRY_FRANCE);
+    }
+
+    // ============================================
     // TEST 10: STATE — Unregistered investor is not verified
     // ============================================
     function test_IsVerified_NotRegistered() public view {
@@ -225,6 +308,23 @@ contract IdentityRegistryTest is Test {
     }
 
     // ============================================
+    // TEST 12b: STATE — deleteIdentity reverts if token not set
+    // ============================================
+    function test_DeleteIdentity_TokenNotSet() public {
+        IdentityRegistry freshRegistry = _deployRegistry(admin);
+        vm.startPrank(admin);
+        freshRegistry.grantRole(freshRegistry.ISSUER_ROLE(), issuer);
+        vm.stopPrank();
+
+        vm.prank(issuer);
+        freshRegistry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE);
+
+        vm.expectRevert(IIdentityRegistry.IIdentityRegistry__TokenNotSet.selector);
+        vm.prank(issuer);
+        freshRegistry.deleteIdentity(karim);
+    }
+
+    // ============================================
     // TEST 13: STATE — Update identity works
     // ============================================
     function test_UpdateIdentity() public {
@@ -254,6 +354,26 @@ contract IdentityRegistryTest is Test {
 
         vm.prank(issuer);
         registry.updateIdentity(karim, address(newIdentity));
+    }
+
+    // ============================================
+    // TEST 14b: STATE — Update identity rejects already-used contract
+    // ============================================
+    function test_UpdateIdentity_DuplicateIdentityContract() public {
+        vm.prank(issuer);
+        registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE);
+
+        MockIdentity bobIdentity = new MockIdentity();
+        vm.prank(issuer);
+        registry.registerIdentity(bob, address(bobIdentity), COUNTRY_FRANCE);
+
+        vm.prank(issuer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IIdentityRegistry.IIdentityRegistry__IdentityContractAlreadyAssigned.selector, address(bobIdentity), bob
+            )
+        );
+        registry.updateIdentity(karim, address(bobIdentity));
     }
 
     // ============================================
@@ -1053,7 +1173,7 @@ contract IdentityRegistryTest is Test {
         uint16[] memory countries = new uint16[](0);
 
         vm.prank(admin);
-        vm.expectRevert(IIdentityRegistry.IIdentityRegistry__ArrayLengthMismatch.selector);
+        vm.expectRevert(IIdentityRegistry.IIdentityRegistry__EmptyBatch.selector);
         registry.batchRegisterIdentity(investors, identities, countries);
     }
 
@@ -1177,6 +1297,169 @@ contract IdentityRegistryTest is Test {
             IIdentityRegistry.InvestorType.Accredited,
             block.timestamp + 365 days
         ) {
+            assertTrue(false, "Should revert");
+        } catch {
+            // branch covered
+        }
+    }
+
+    // ============================================
+    // TEST 65b: batchRegisterIdentity — duplicate identity contract reverts
+    // ============================================
+    function test_BatchRegisterIdentity_DuplicateIdentityContract() public {
+        address[] memory investors = new address[](2);
+        investors[0] = karim;
+        investors[1] = bob;
+
+        address[] memory identities = new address[](2);
+        identities[0] = address(mockIdentity);
+        identities[1] = address(mockIdentity);
+
+        uint16[] memory countries = new uint16[](2);
+        countries[0] = COUNTRY_UAE;
+        countries[1] = COUNTRY_FRANCE;
+
+        vm.prank(issuer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IIdentityRegistry.IIdentityRegistry__IdentityContractAlreadyAssigned.selector,
+                address(mockIdentity),
+                karim
+            )
+        );
+        registry.batchRegisterIdentity(investors, identities, countries);
+    }
+
+    // ============================================
+    // TEST 65c: batchRegisterIdentity — invalid country reverts
+    // ============================================
+    function test_BatchRegisterIdentity_InvalidCountry() public {
+        address[] memory investors = new address[](1);
+        investors[0] = karim;
+
+        address[] memory identities = new address[](1);
+        identities[0] = address(mockIdentity);
+
+        uint16[] memory countries = new uint16[](1);
+        countries[0] = 1000;
+
+        vm.prank(issuer);
+        vm.expectRevert(abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__InvalidCountryCode.selector, 1000));
+        registry.batchRegisterIdentity(investors, identities, countries);
+    }
+
+    // ============================================
+    // TEST 65d: updateIdentity — same identity reverts
+    // ============================================
+    function test_UpdateIdentity_SameIdentityReverts() public {
+        vm.prank(issuer);
+        registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE);
+
+        vm.prank(issuer);
+        vm.expectRevert(
+            abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__IdentityAlreadyExists.selector, karim)
+        );
+        registry.updateIdentity(karim, address(mockIdentity));
+    }
+
+    // ============================================
+    // TEST 65e: registerIdentity overload — duplicate identity contract reverts
+    // ============================================
+    function test_RegisterIdentityOverload_DuplicateIdentityContract() public {
+        vm.prank(issuer);
+        registry.registerIdentity(
+            karim, address(mockIdentity), COUNTRY_UAE, IIdentityRegistry.InvestorType.Accredited, block.timestamp + 365 days
+        );
+
+        vm.prank(issuer);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IIdentityRegistry.IIdentityRegistry__IdentityContractAlreadyAssigned.selector,
+                address(mockIdentity),
+                karim
+            )
+        );
+        registry.registerIdentity(
+            bob, address(mockIdentity), COUNTRY_FRANCE, IIdentityRegistry.InvestorType.Retail, block.timestamp + 365 days
+        );
+    }
+
+    // ============================================
+    // TEST 65f: PAUSE — Emits Paused event
+    // ============================================
+    function test_Pause_EmitsEvent() public {
+        vm.expectEmit(false, false, false, true);
+        emit Pausable.Paused(admin);
+
+        vm.prank(admin);
+        registry.pause();
+    }
+
+    // ============================================
+    // TEST 65g: UNPAUSE — Emits Unpaused event
+    // ============================================
+    function test_Unpause_EmitsEvent() public {
+        vm.prank(admin);
+        registry.pause();
+
+        vm.expectEmit(false, false, false, true);
+        emit Pausable.Unpaused(admin);
+
+        vm.prank(admin);
+        registry.unpause();
+    }
+
+    // ============================================
+    // TEST 65h: CONSTRUCTOR — Disable initializers on implementation
+    // ============================================
+    function test_Constructor_DisableInitializers() public {
+        IdentityRegistry impl = new IdentityRegistry();
+        vm.expectRevert();
+        impl.initialize(admin);
+    }
+
+    // ============================================
+    // TEST 65h: setToken — EOA reverts
+    // ============================================
+    function test_SetToken_EOAReverts() public {
+        IdentityRegistry freshRegistry = _deployRegistry(admin);
+        address eoa = makeAddr("eoaToken");
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IIdentityRegistry.IIdentityRegistry__InvalidIdentity.selector, eoa));
+        freshRegistry.setToken(eoa);
+    }
+
+    // ============================================
+    // TEST 65i: WORKAROUND — zero-address modifier branch via try/catch
+    // ============================================
+    function test_NonZeroAddressModifier_CoverageWorkaround() public {
+        vm.prank(issuer);
+        try registry.registerIdentity(address(0), address(mockIdentity), COUNTRY_UAE) {
+            assertTrue(false, "Should revert");
+        } catch {
+            // branch covered
+        }
+    }
+
+    // ============================================
+    // TEST 65j: WORKAROUND — valid-country modifier branch via try/catch
+    // ============================================
+    function test_ValidCountryModifier_CoverageWorkaround() public {
+        vm.prank(issuer);
+        try registry.registerIdentity(karim, address(mockIdentity), 0) {
+            assertTrue(false, "Should revert");
+        } catch {
+            // branch covered
+        }
+    }
+
+    // ============================================
+    // TEST 65k: WORKAROUND — is-contract modifier branch via try/catch
+    // ============================================
+    function test_IsContractModifier_CoverageWorkaround() public {
+        vm.prank(issuer);
+        try registry.registerIdentity(karim, makeAddr("eoa"), COUNTRY_UAE) {
             assertTrue(false, "Should revert");
         } catch {
             // branch covered

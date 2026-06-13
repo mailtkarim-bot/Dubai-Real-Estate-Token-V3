@@ -29,12 +29,15 @@ interface IIdentityRegistry {
     error IIdentityRegistry__InvalidIdentity(address identity);
     error IIdentityRegistry__InvalidCountryCode(uint16 country);
     error IIdentityRegistry__ArrayLengthMismatch();
+    error IIdentityRegistry__EmptyBatch();
     error IIdentityRegistry__BatchSizeExceeded(uint256 size);
     error IIdentityRegistry__NotAuthorizedIssuer(address issuer);
     error IIdentityRegistry__KYCExpired(address investor);
     error IIdentityRegistry__KYCExpiryTooSoon(uint256 expiry);
     error IIdentityRegistry__IdentityHasBalance(address investor);
     error IIdentityRegistry__IdentityHasPendingDividends(address investor);
+    error IIdentityRegistry__TokenNotSet();
+    error IIdentityRegistry__IdentityContractAlreadyAssigned(address identity, address existingInvestor);
 
     event IdentityRegistered(address indexed investor, address indexed identity);
     event IdentityRemoved(address indexed investor, address indexed identity);
@@ -47,6 +50,7 @@ interface IIdentityRegistry {
     event TrustedIssuerRemoved(address indexed trustedIssuer, address indexed actor);
     event TrustedIssuerClaimTopicsUpdated(address indexed trustedIssuer, uint256[] claimTopics, address indexed actor);
 
+    event TokenSet(address indexed oldToken, address indexed newToken);
     event IdentityRegistryStorageSet(address indexed storage_);
     event ClaimTopicsRegistrySet(address indexed registry);
     event TrustedIssuersRegistrySet(address indexed registry);

@@ -5,21 +5,18 @@
 ![Solidity](https://img.shields.io/badge/Solidity-0.8.28-363636?logo=solidity&logoColor=white)
 ![Foundry](https://img.shields.io/badge/Foundry-Tested-00B4D8?logo=ethereum&logoColor=white)
 ![OpenZeppelin](https://img.shields.io/badge/OpenZeppelin-v5-4E5EE4?logo=openzeppelin&logoColor=white)
-![Tests](https://img.shields.io/badge/Tests-227%2F227%20Passing-brightgreen)
+![Tests](https://img.shields.io/badge/Tests-282%2F282%20Passing-brightgreen)
 ![Fuzzing](https://img.shields.io/badge/Fuzzing-8%2F8%20%C3%97%2010k%20runs-brightgreen)
-![Coverage](https://img.shields.io/badge/Coverage-96.8%25%20core%20contracts-2ECC71)
+![Invariant](https://img.shields.io/badge/Invariant-6%2F6%20%C3%97%20256%20runs-brightgreen)
+![Coverage](https://img.shields.io/badge/Coverage-96.4%25%20core%20contracts-2ECC71)
 ![Sepolia](https://img.shields.io/badge/Sepolia-Deployed%20%26%20Verified-blue)
 [![Frontend](https://img.shields.io/badge/Frontend-Live%20Demo-gold)](https://mailtkarim-bot.github.io/dubai-real-estate-v2/)
 ![License](https://img.shields.io/badge/License-MIT-F4D03F)
 ![Internal Review](https://img.shields.io/badge/Internal%20Review-Passed-yellow)
-![External Audit](https://img.shields.io/badge/External%20Audit-Pending-red)
 
-**Educational RWA tokenization architecture inspired by ERC-3643 (T-REX).**  
-Smart contract portfolio project demonstrating on-chain identity registry, automated compliance engine, dividend distribution, and Etherscan-verified Sepolia deployment. This is a learning project, not a production security token.
+**Portfolio-grade RWA tokenization smart contract suite inspired by ERC-3643 (T-REX).**
 
-> ⚠️ **Not ERC-3643 certified.** Phase 1 implements a simplified identity registry and compliance engine. Full T-REX features (ERC-734/735 claims, trusted issuers validation, modular compliance modules) are on the Phase 2 roadmap.
-
-> ⚠️ **Not production-ready.** No external security audit has been performed. For production RWA tokenization, consult a licensed entity and a Tier-1 audit firm.
+Built with Solidity 0.8.28 and OpenZeppelin v5, DREIT demonstrates on-chain identity verification, automated compliance enforcement, stablecoin dividend distribution, UUPS upgradeable proxies, TimelockController governance, and a fully verified Sepolia testnet deployment — backed by a React frontend.
 
 <div align="center">
 
@@ -28,6 +25,20 @@ Smart contract portfolio project demonstrating on-chain identity registry, autom
 </div>
 
 </div>
+
+---
+
+## 🚀 Project Highlights
+
+- **282 Foundry tests pass** — unit, integration, fuzzing (8 × 10k runs), and invariant (6 × 256 runs) campaigns.
+- **96.4% core contract coverage** — all core functions at 100%, branches at ~94%.
+- **Internal security audit (V3 Phase 2)** — all High/Medium findings remediated; fixes include hook access control, identity deletion safety, whitelist symmetry, and reentrancy guards.
+- **UUPS upgradeable architecture** — proxies for `IdentityRegistry`, `ComplianceEngine`, and `DubaiRealEstateToken` with upgrade authorization via Timelock.
+- **TimelockController governance** — 48-hour delay on admin actions, with proposer/executor roles designed for a Gnosis Safe.
+- **Verified Sepolia deployment** — 7 contracts deployed and auto-verified on Etherscan.
+- **Live React frontend** — GitHub Pages demo connected to verified Sepolia contracts.
+
+> ⚠️ **Disclaimer:** This is a portfolio and educational project. It is not ERC-3643 certified and has not undergone an external security audit. It should not be used to tokenize real assets without legal counsel, a licensed entity, and a Tier-1 audit.
 
 ---
 
@@ -126,6 +137,9 @@ This architecture is a **portfolio-grade foundation** for regulated primary issu
 | **Compliance Engine** | Pre/post transfer hooks with freeze lists, country restrictions, whitelists | ✅ Deployed & Verified |
 | **Emergency Pause** | OpenZeppelin `Pausable` — instant freeze on incident detection | ✅ Tested |
 | **Reentrancy Protection** | `ReentrancyGuard` on `mint`, `burn`, `claimDividends`, `distributeDividends` | ✅ Tested |
+| **UUPS Upgradeability** | OpenZeppelin `ERC1967Proxy` + `UUPSUpgradeable` — logic upgrades without losing state | ✅ Deployed & Verified |
+| **TimelockController** | 48-hour minimum delay on all admin actions — no instant upgrades or role changes | ✅ Deployed & Verified |
+| **Gnosis Safe Multisig** | PROPOSER/EXECUTOR/CANCELLER roles assigned to Safe on mainnet (deployer on Sepolia demo) | ✅ Configured |
 | **Role-Based Access Control** | OpenZeppelin `AccessControl` — separate DEFAULT_ADMIN, ISSUER, REGULATOR roles | ✅ Tested |
 | **Anti-Retroactive Dividend Theft** | `lastClaimed` initialized for new holders — prevents draining past dividends | ✅ Tested |
 | **Max Supply Guard** | Hard cap of 1 billion tokens with saturation fuzzing | ✅ Tested |
@@ -133,6 +147,11 @@ This architecture is a **portfolio-grade foundation** for regulated primary issu
 | **Identity Balance Lock** | `deleteIdentity` rejected if `balanceOf > 0` | ✅ Tested (Bug #6) |
 | **KYC Expiry Sanity Check** | Minimum 1-day expiry — prevents instant lockout | ✅ Tested (Bug #7) |
 | **Compliance-Token Binding** | `compliance.bindToken()` enforced in deployment script | ✅ Tested (Bug #8) |
+| **Hook Access Control** | `transferred/created/destroyed` restricted to the bound token (`onlyToken`) | ✅ Fixed & Tested |
+| **Identity Deletion Safety** | `deleteIdentity` reverts if the token is not linked, preventing KYC bypass | ✅ Fixed & Tested |
+| **Whitelist Symmetry** | Whitelist mode checks both sender and recipient | ✅ Fixed & Tested |
+| **Input Validation** | `setIdentityRegistry` and `restrictCountry` validate contract/code inputs | ✅ Fixed & Tested |
+| **Reentrancy Defense** | `transfer` / `transferFrom` protected by `nonReentrant` | ✅ Fixed & Tested |
 
 ### Security Hardening (8 Critical Design Improvements)
 
@@ -177,9 +196,10 @@ dubai-real-estate-v2/
 │   ├── integration/                          # End-to-end flows
 │   └── fuzzing/                              # 8 fuzzing campaigns × 10k runs
 ├── 📁 script/deploy/                           # Deployment scripts
-│   ├── DeployLocal.s.sol                     # Anvil local deployment
-│   ├── DeployTestnet.s.sol                   # Sepolia deployment + verify
-│   └── DeployMainnet.s.sol                   # Mainnet deployment template
+│   ├── DeployPhase2.s.sol                    # UUPS + Timelock + Safe deployment
+│   └── HelperConfig.s.sol                    # Network configuration helper
+├── 📁 script/upgrade/                          # Upgrade scripts
+│   └── UpgradeDREIT.s.sol                    # UUPS upgrade via Timelock workflow
 ├── 📁 frontend/                                # React + Vite + wagmi DApp
 │   ├── src/                                  # Components, pages, ABIs, wagmi config
 │   ├── public/                               # Static assets
@@ -242,6 +262,35 @@ dubai-real-estate-v2/
 
 Full architecture document: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
 
+### Core Contracts
+
+#### DubaiRealEstateToken (UUPS Proxy + Impl)
+
+- **Standards**: `ERC-20Upgradeable` + `AccessControlUpgradeable` + `PausableUpgradeable` + `ReentrancyGuard` + `UUPSUpgradeable`
+- **Roles**: `DEFAULT_ADMIN_ROLE` (Timelock), `ISSUER_ROLE`, `REGULATOR_ROLE`
+- **Key State**: `stablecoin`, `identityRegistry`, `complianceEngine`, `dividendPerToken`, `pendingDividends`, `lastClaimed`
+- **Events**: `TokensMinted`, `TokensBurned`, `ForcedTransfer`, `ForcedBurn`, `DividendsDistributed`, `DividendClaimed`, `DividendSynced`
+- **Upgrade**: `_authorizeUpgrade` restricted to `DEFAULT_ADMIN_ROLE` (Timelock)
+
+#### IdentityRegistry (UUPS Proxy + Impl)
+
+- **Role**: `DEFAULT_ADMIN_ROLE` (Timelock), `ISSUER_ROLE`
+- **Key State**: investor → identity mapping, identity-contract uniqueness, KYC expiry, country, investor type, linked token
+- **Events**: `IdentityRegistered`, `IdentityRemoved`, `IdentityUpdated`, `CountryUpdated`, `InvestorTypeUpdated`, `KYCExpiryUpdated`, `TokenSet`
+
+#### ComplianceEngine (UUPS Proxy + Impl)
+
+- **Role**: `DEFAULT_ADMIN_ROLE` (Timelock), `REGULATOR_ROLE`
+- **Key State**: bound token, frozen investors, restricted countries, whitelist mode
+- **Events**: `InvestorFrozen`, `InvestorUnfrozen`, `CountryRestricted`, `CountryUnrestricted`, `TokenBound`, `TokenUnbound`
+- **Hook Security**: `transferred/created/destroyed` callable only by the bound token
+
+#### TimelockController
+
+- **Delay**: 48 hours (`minDelay = 172 800`)
+- **Roles**: PROPOSER/EXECUTOR/CANCELLER = Gnosis Safe (mainnet) / deployer (Sepolia demo)
+- **Admin**: Renounced by deployer after bootstrap
+
 ---
 
 ## 📊 Test Results
@@ -249,20 +298,20 @@ Full architecture document: [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md)
 ```bash
 $ make test
 
-[⠊] Compiling...
-No files changed, compilation skipped
+╭--------------------------------------+--------+--------+---------╮
+| Test Suite                           | Passed | Failed | Skipped |
++==================================================================+
+| DubaiRealEstateTokenFuzzTest         | 8      | 0      | 0       |
+| DREITIntegrationTest                 | 3      | 0      | 0       |
+| ComplianceEngineTest                 | 62     | 0      | 0       |
+| DREITUpgradeTest                     | 5      | 0      | 0       |
+| DubaiRealEstateTokenTest             | 103    | 0      | 0       |
+| IdentityRegistryTest                 | 91     | 0      | 0       |
+| UpgradeRegistryAndComplianceTest     | 4      | 0      | 0       |
+| DubaiRealEstateTokenInvariantTest    | 6      | 0      | 0       |
+╰--------------------------------------+--------+--------+---------╯
 
-╭------------------------------+--------+--------+---------╮
-| Test Suite                   | Passed | Failed | Skipped |
-+==========================================================+
-| DubaiRealEstateTokenFuzzTest | 8      | 0      | 0       |
-| DREITIntegrationTest         | 3      | 0      | 0       |
-| ComplianceEngineTest         | 46     | 0      | 0       |
-| DubaiRealEstateTokenTest     | 91     | 0      | 0       |
-| IdentityRegistryTest         | 76     | 0      | 0       |
-╰------------------------------+--------+--------+---------╯
-
-Ran 5 test suites: 227 unit tests + 3 integration tests + 8 fuzzing tests passed, 0 failed, 0 skipped
+Ran 8 test suites: 282 tests passed, 0 failed, 0 skipped
 ```
 
 ### Fuzzing Campaign
@@ -270,16 +319,37 @@ Ran 5 test suites: 227 unit tests + 3 integration tests + 8 fuzzing tests passed
 ```bash
 $ forge test --match-contract DubaiRealEstateTokenFuzzTest
 
-[PASS] testFuzz_BurnReducesTotalSupply(uint256,uint256) (runs: 10000, μ: 271083, ~: 273841)
-[PASS] testFuzz_DividendDistributionIsConsistent(uint256,uint256,uint256) (runs: 10000, μ: 546729, ~: 547002)
-[PASS] testFuzz_DividendSolvencyAfterMintAndDistribute(uint256,uint256,uint256) (runs: 10000, μ: 654170, ~: 654443)
-[PASS] testFuzz_ForcedTransferRespectsComplianceFrom(uint256,uint256) (runs: 10000, μ: 584563, ~: 584724)
-[PASS] testFuzz_FrozenAccountCannotTransfer(uint256,uint256) (runs: 10000, μ: 566985, ~: 567146)
-[PASS] testFuzz_KYCExpiryLocksTransfers(uint256,uint256) (runs: 10000, μ: 569523, ~: 569684)
-[PASS] testFuzz_MaxSupplyCannotBeExceeded(uint256,uint256) (runs: 10000, μ: 228292, ~: 228373)
-[PASS] testFuzz_MintSyncsDividendsProportionally(uint256,uint256,uint256) (runs: 10000, μ: 533217, ~: 533490)
+[PASS] testFuzz_BurnReducesTotalSupply(uint256,uint256) (runs: 10000, μ: 343017, ~: 345974)
+[PASS] testFuzz_DividendDistributionIsConsistent(uint256,uint256,uint256) (runs: 10000, μ: 638568, ~: 638682)
+[PASS] testFuzz_DividendSolvencyAfterMintAndDistribute(uint256,uint256,uint256) (runs: 10000, μ: 754232, ~: 754346)
+[PASS] testFuzz_ForcedTransferRespectsComplianceFrom(uint256,uint256) (runs: 10000, μ: 678465, ~: 678692)
+[PASS] testFuzz_FrozenAccountRevertsTransfer(uint256,uint256) (runs: 10000, μ: 495664, ~: 495645)
+[PASS] testFuzz_KYCExpiredRevertsBurnAndClaim(uint256) (runs: 10000, μ: 449249, ~: 452012)
+[PASS] testFuzz_MintRespectsMaxSupply(uint256,uint256) (runs: 10000, μ: 472435, ~: 511726)
+[PASS] testFuzz_SupplyConservation(uint256[],uint256[]) (runs: 10000, μ: 2382313, ~: 2335505)
 
 Suite result: ok. 8 passed; 0 failed; 0 skipped
+```
+
+### Invariant Campaign
+
+```bash
+$ forge test --match-contract DubaiRealEstateTokenInvariantTest --summary
+
+[PASS] invariant_BalanceSumEqualsTotalSupply() (runs: 256, calls: 8192, reverts: 0)
+[PASS] invariant_DividendPerTokenMonotonic() (runs: 256, calls: 8192, reverts: 0)
+[PASS] invariant_FrozenStateMatchesGhost() (runs: 256, calls: 8192, reverts: 0)
+[PASS] invariant_NoTokensHeldByTokenContract() (runs: 256, calls: 8192, reverts: 0)
+[PASS] invariant_SumClaimablesLeStablecoinBalancePlusDust() (runs: 256, calls: 8192, reverts: 0)
+[PASS] invariant_SupplyAtMostMax() (runs: 256, calls: 8192, reverts: 0)
+
+Suite result: ok. 6 passed; 0 failed; 0 skipped
+
+╭-----------------------------------+--------+--------+---------╮
+| Test Suite                        | Passed | Failed | Skipped |
++===============================================================+
+| DubaiRealEstateTokenInvariantTest | 6      | 0      | 0       |
+╰-----------------------------------+--------+--------+---------╯
 ```
 
 ---
@@ -290,12 +360,13 @@ Coverage excludes deployment scripts and test files. Core contract coverage:
 
 | Contract | Lines | Statements | Branches | Functions |
 |----------|-------|------------|----------|-----------|
-| **ComplianceEngine.sol** | 97.33% | 98.59% | **100.00%** | 96.30% |
-| **IdentityRegistry.sol** | 98.85% | 98.12% | 91.43% | **100.00%** |
-| **DubaiRealEstateToken.sol** | 94.68% | 94.21% | 91.53% | **100.00%** |
-| **Core Contracts Average** | **96.95%** | **96.97%** | **94.32%** | **98.77%** |
+| **ComplianceEngine.sol** | 91.95% | 90.59% | 94.12% | **100.00%** |
+| **IdentityRegistry.sol** | 96.06% | 95.70% | 93.02% | **100.00%** |
+| **DubaiRealEstateToken.sol** | 97.57% | 96.96% | 95.16% | **100.00%** |
+| **DubaiRealEstateTokenV2.sol** | **100.00%** | **100.00%** | — | **100.00%** |
+| **Core Contracts Average** | **96.40%** | **95.81%** | **94.10%** | **100.00%** |
 
-> Global coverage is 77.30% because Foundry includes deployment scripts (`script/`) at 0% coverage. Excluding scripts, the core tokenization and compliance logic is **>96% covered**.
+> `forge coverage` is run with `--ir-minimum` because `DeployPhase2.s.sol` requires `via_ir`. This flag produces source-mapping approximations: some executed lines (constructors, inherited `__*_init` calls, and internal `_pause`/`_unpause` invocations) are reported as uncovered even though the paths are tested. The real coverage is therefore slightly higher than displayed. The project is intentionally left at this level rather than chasing a misleading percentage.
 
 ---
 
@@ -311,7 +382,7 @@ Coverage excludes deployment scripts and test files. Core contract coverage:
 
 ```bash
 # 1. Clone the repository
-git clone https://github.com/TON_USER/dubai-real-estate-v2.git
+git clone https://github.com/mailtkarim-bot/dubai-real-estate-v2.git
 cd dubai-real-estate-v2
 
 # 2. Install Foundry dependencies
@@ -334,8 +405,9 @@ make deploy-local
 
 ```bash
 # 1. Configure environment variables
-cp .env.example .env
-# Edit .env with your SEPOLIA_RPC_URL, PRIVATE_KEY, and ETHERSCAN_API_KEY
+cp env-sepolia-template.txt .env
+# Edit .env with your PRIVATE_KEY, SEPOLIA_RPC_URL, ETHERSCAN_API_KEY,
+# GNOSIS_SAFE, ISSUER_ADDRESS, and REGULATOR_ADDRESS.
 
 # 2. Dry run (zero ETH spent)
 make deploy-sepolia-dry
@@ -348,21 +420,27 @@ make deploy-sepolia
 
 ## 🌐 Sepolia Testnet
 
-Contracts deployed and verified on **Sepolia Testnet** (Ethereum test network).
+All contracts below are deployed and verified on **Sepolia Testnet** (Ethereum test network). The addresses and Etherscan links are publicly verifiable.
 
 | Contract | Address | Explorer |
 |----------|---------|----------|
-| **DubaiRealEstateToken (DREIT)** | `0x2fAD3898ccBdc4A933170B0d551bd10b8b659fc6` | [View on Etherscan](https://sepolia.etherscan.io/address/0x2fAD3898ccBdc4A933170B0d551bd10b8b659fc6) |
-| **IdentityRegistry** | `0xECD85Ebd68a548705f902c6D244BfBA76f51F9Fc` | [View on Etherscan](https://sepolia.etherscan.io/address/0xECD85Ebd68a548705f902c6D244BfBA76f51F9Fc) |
-| **ComplianceEngine** | `0x87b62081D607C022B2495D5B6555829fA84E33d6` | [View on Etherscan](https://sepolia.etherscan.io/address/0x87b62081D607C022B2495D5B6555829fA84E33d6) |
+| **DubaiRealEstateToken Proxy (DREIT)** | `0x20BA3Dfa13295020b23758474ee831fD8E0f629B` | [View on Etherscan](https://sepolia.etherscan.io/address/0x20BA3Dfa13295020b23758474ee831fD8E0f629B) |
+| **DubaiRealEstateToken Impl V1** | `0xf048242a7231dbA259103D02c04530692950de6c` | [View on Etherscan](https://sepolia.etherscan.io/address/0xf048242a7231dbA259103D02c04530692950de6c) |
+| **IdentityRegistry Proxy** | `0xadCEa5d2d447a324C7577E48E0E2be83fBBC45e9` | [View on Etherscan](https://sepolia.etherscan.io/address/0xadCEa5d2d447a324C7577E48E0E2be83fBBC45e9) |
+| **IdentityRegistry Impl** | `0x59424D6a9075DAD8C0Aae5923d41983aDC4cBAde` | [View on Etherscan](https://sepolia.etherscan.io/address/0x59424D6a9075DAD8C0Aae5923d41983aDC4cBAde) |
+| **ComplianceEngine Proxy** | `0xF5b23EFD5cb4C05D87FEF1E72766e08DAe5C54af` | [View on Etherscan](https://sepolia.etherscan.io/address/0xF5b23EFD5cb4C05D87FEF1E72766e08DAe5C54af) |
+| **ComplianceEngine Impl** | `0x40abC6E019A518B7B472cCba0B85932D89d0ca0e` | [View on Etherscan](https://sepolia.etherscan.io/address/0x40abC6E019A518B7B472cCba0B85932D89d0ca0e) |
+| **TimelockController** | `0x902DE2750EF01368dA423D64c7a9F11637368b14` | [View on Etherscan](https://sepolia.etherscan.io/address/0x902DE2750EF01368dA423D64c7a9F11637368b14) |
 
 - **Network:** Sepolia Testnet (Chain ID: 11155111)
 - **Deployer:** `0x9e3f8146d3FA4B37033e73BFC95728f5B65B2473`
-- **Block:** 11016999
-- **Date:** June 8, 2026
-- **Gas Used:** 0.00625 ETH
+- **Gnosis Safe (demo):** `0x9e3f8146d3FA4B37033e73BFC95728f5B65B2473` (deployer — must be a real Safe on mainnet)
+- **Timelock Delay:** 48 hours (172 800 seconds)
+- **Date:** June 12, 2026
 - **Deployment artifact:** [`deployments/testnet.json`](./deployments/testnet.json)
 - **Stablecoin:** Sepolia USDC `0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238`
+
+> **Note:** These addresses reflect a fresh post-audit Phase 2 redeployment with all V3 audit fixes included.
 
 ### Sepolia Deployment Command
 
@@ -370,8 +448,8 @@ Contracts deployed and verified on **Sepolia Testnet** (Ethereum test network).
 # Using the Makefile (recommended)
 make deploy-sepolia
 
-# Or manually with forge
-forge script script/deploy/DeployTestnet.s.sol \
+# Or manually with forge (private key loaded from .env)
+forge script script/deploy/DeployPhase2.s.sol \
   --rpc-url $SEPOLIA_RPC_URL \
   --private-key $PRIVATE_KEY \
   --broadcast \
@@ -388,7 +466,7 @@ forge script script/deploy/DeployTestnet.s.sol \
 | **Smart Contract** | Solidity 0.8.28, OpenZeppelin Contracts v5 |
 | **Frontend** | React 19, Vite 8, Tailwind CSS v4, wagmi/viem |
 | **Standard** | ERC-3643 (T-REX) inspired, ERC-20 |
-| **Testing** | Foundry (Forge + Cast), 213 unit tests, 8 fuzzing campaigns |
+| **Testing** | Foundry (Forge + Cast), 282 tests, 8 fuzz + 6 invariant campaigns |
 | **Coverage** | `forge coverage` + lcov HTML report |
 | **CI/CD** | GitHub Actions ready |
 | **Target Network** | Ethereum / Sepolia Testnet / Local Anvil |
@@ -439,16 +517,19 @@ Three distinct roles (`DEFAULT_ADMIN_ROLE`, `ISSUER_ROLE`, `REGULATOR_ROLE`) pre
 
 | Step | Status | Notes |
 |------|--------|-------|
-| Unit tests | ✅ | 213/213 passed |
+| Unit tests | ✅ | 282/282 passed |
 | Fuzzing tests | ✅ | 8 campaigns × 10,000 runs, 0 failures |
+| Invariant tests | ✅ | 6 invariants × 256 runs × depth 32, 0 failures |
 | Security bug fixes | ✅ | 8 security hardening improvements |
-| Core contract coverage | ✅ | >96% lines, >94% branches |
-| Sepolia testnet deployment | ✅ | June 8, 2026 — 3 contracts verified |
+| Core contract coverage | ✅ | ~96.4% lines, ~94.1% branches (displayed with `--ir-minimum`) |
+| Sepolia testnet deployment | ✅ | June 12, 2026 — UUPS proxies + Timelock verified |
 | Etherscan verification | ✅ | Auto-verified on deployment |
 | NatSpec documentation | ✅ | All public/external functions documented |
+| Internal security audit (V3 Phase 2) | ✅ | High/Medium findings fixed, 282 tests pass |
 | External audit | ⏳ | Trail of Bits / OpenZeppelin / CertiK |
-| TimelockController | ⏳ | Replace direct admin before mainnet |
-| Multisig (Gnosis Safe) | ⏳ | Owner = Safe with 3/5 signers |
+| TimelockController | ✅ | 48h delay enforced; admin = Timelock |
+| Multisig (Gnosis Safe) | ⚠️ | Required on mainnet; deployer used on Sepolia demo |
+| Secure deployment | ✅ | Private key loaded from `.env`; never hardcoded in scripts |
 | Frontend integration | ✅ | DApp React + wallet connect (GitHub Pages) |
 | Legal compliance | ⏳ | VARA / DFSA regulatory consultation |
 
@@ -458,88 +539,70 @@ Three distinct roles (`DEFAULT_ADMIN_ROLE`, `ISSUER_ROLE`, `REGULATOR_ROLE`) pre
 
 | Risk | Description | Mitigation |
 |------|-------------|------------|
-| **Admin Centralization** | Admin can pause, mint, freeze, and upgrade registries | Timelock + Gnosis Safe before mainnet; role separation already implemented |
+| **Admin Centralization** | Admin can pause, mint, freeze, and upgrade registries | Timelock + Gnosis Safe required on mainnet; role separation implemented; deployer renounces Timelock admin after deployment |
 | **KYC Oracle Dependency** | Identity verification relies on off-chain issuers | Multiple trusted issuers registry; expiry enforcement on-chain |
 | **Stablecoin Dependency** | Dividends use USDC (6 decimals) | Explicit decimal handling; adapter ready for DAI if needed |
 | **Illiquidity** | No integrated secondary market | Documented — to implement via permissioned DEX or centralized order book |
 | **Regulatory Change** | Dubai / UAE regulations may evolve | Modular compliance engine allows rule updates without token redeployment |
-| **Undiscovered Bug** | No external audit has been performed | Mandatory audit before mainnet; 213 unit tests + 8 fuzzing campaigns as first line |
+| **Undiscovered Bug** | No external audit has been performed | Mandatory audit before mainnet; 282 tests + 8 fuzz + 6 invariant campaigns as first line |
 
 ---
 
 ## 📸 Screenshots
 
-### Foundry Test Suite — 213/213 Passed
+All screenshots below are stored in `docs/screenshots/` and reflect the current state of the project.
+
+### ✅ Testing
+
+#### Foundry Test Suite — 282/282 Passed
+Command: `make test`
+
 ![Tests Passing](docs/screenshots/All+tests_summary.png)
 
-### Fuzzing Campaign — 8/8 × 10,000 Runs
-![Fuzzing Tests](docs/screenshots/Fuzzing_test_8%20passed.png)
+---
 
-### Coverage Report — Core Contracts >96%
-![Coverage Report](docs/screenshots/coverage_report_index_html.png)
+### 📈 Coverage
+
+#### Coverage Report — Core Contracts ~96.4%
+Command: `make coverage`
+
+![Coverage Report](docs/screenshots/make_coverage-Terminal.png)
 
 ---
 
-### 🌐 Sepolia Deployment — Terminal Output
+### 🚀 Deployments
+
+#### Sepolia Deployment — Terminal Output
+Command: `make deploy-sepolia`
+
 ![Sepolia Deploy Terminal](docs/screenshots/Deploy_Sepolia_Terminal.png)
 
-### 🌐 Sepolia Deployment — Address Artifact
-![Deployment JSON](docs/screenshots/Deploy_Adress_JSON.png)
+#### Sepolia Deployment — Address Artifact
+Path: `deployments/testnet.json`
 
----
+![Sepolia Deploy JSON](docs/screenshots/Deploy_Adress_JSON.png)
 
-### 🖥️ Local Deployment — Anvil (Offline Testing)
+#### Local Deployment — Anvil + Deploy
+Commands: `make anvil` (terminal 1) + `make deploy-local` (terminal 2)
 
-<p align="center">
-  <img src="docs/screenshots/deploy-local-1.png" width="48%" alt="Local Deploy Terminal 1" />
-  <img src="docs/screenshots/deploy-local-2.png" width="48%" alt="Local Deploy Terminal 2" />
-</p>
+![Local Deploy Terminal](docs/screenshots/deploy-local-.png)
 
-### 🖥️ Local Deployment — Address Artifact
+#### Local Deployment — Address Artifact
+Path: `deployments/local.json`
+
 ![Local Deployment JSON](docs/screenshots/deployment_local_JSON.png)
 
 ---
 
-### 🌐 Etherscan — DREIT Token Contract
+### 🌐 Etherscan Verification
+
+#### DREIT Token Proxy
+Links: [Overview](https://sepolia.etherscan.io/address/0x20BA3Dfa13295020b23758474ee831fD8E0f629B) · [Code](https://sepolia.etherscan.io/address/0x20BA3Dfa13295020b23758474ee831fD8E0f629B#code)
+
 <p align="center">
-  <img src="docs/screenshots/Etherscan_Deploy/03a-etherscan-dreit-token-overview.png" width="48%" alt="DREIT Overview" />
-  <img src="docs/screenshots/Etherscan_Deploy/03b-etherscan-dreit-token-code.png" width="48%" alt="DREIT Code" />
+  <img src="docs/screenshots/Etherscan_Deploy/etherscan-dreit-token-overview.png" width="48%" alt="DREIT Overview" />
+  <img src="docs/screenshots/Etherscan_Deploy/etherscan-dreit-token-code.png" width="48%" alt="DREIT Code" />
 </p>
-
-### 🌐 Etherscan — Identity Registry
-<p align="center">
-  <img src="docs/screenshots/Etherscan_Deploy/01a-etherscan-identityregistry-overview.png" width="48%" alt="IdentityRegistry Overview" />
-  <img src="docs/screenshots/Etherscan_Deploy/01b-etherscan-identityregistry-code.png" width="48%" alt="IdentityRegistry Code" />
-</p>
-
-### 🌐 Etherscan — Compliance Engine
-<p align="center">
-  <img src="docs/screenshots/Etherscan_Deploy/02a-etherscan-complianceengine-overview.png" width="48%" alt="ComplianceEngine Overview" />
-  <img src="docs/screenshots/Etherscan_Deploy/02b-etherscan-complianceengine.png" width="48%" alt="ComplianceEngine Code" />
-</p>
-
----
-
-### Contract Architecture
-
-#### DubaiRealEstateToken
-
-- **Standards**: `ERC-20` + `AccessControl` + `Pausable` + `ReentrancyGuard`
-- **Roles**: `DEFAULT_ADMIN_ROLE`, `ISSUER_ROLE`, `REGULATOR_ROLE`
-- **Key State**: `stablecoin`, `identityRegistry`, `complianceEngine`, `dividendPerToken`, `pendingDividends`, `lastClaimed`
-- **Events**: `TokensMinted`, `TokensBurned`, `ForcedTransfer`, `ForcedBurn`, `DividendsDistributed`, `DividendClaimed`, `DividendSynced`
-
-#### IdentityRegistry
-
-- **Role**: `DEFAULT_ADMIN_ROLE` (agent management), `AGENT_ROLE` (identity operations)
-- **Key State**: investor → identity mapping, KYC expiry, country, investor type
-- **Events**: `IdentityRegistered`, `IdentityDeleted`, `IdentityUpdated`, `CountryUpdated`, `InvestorTypeUpdated`, `KYCExpiryUpdated`
-
-#### ComplianceEngine
-
-- **Role**: `DEFAULT_ADMIN_ROLE`, `REGULATOR_ROLE`
-- **Key State**: bound token, frozen investors, restricted countries, whitelist mode
-- **Events**: `InvestorFrozen`, `InvestorUnfrozen`, `CountryRestricted`, `CountryUnrestricted`, `TokenBound`, `TokenUnbound`
 
 ---
 

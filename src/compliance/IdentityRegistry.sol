@@ -4,21 +4,30 @@ pragma solidity 0.8.28;
 import { IIdentityRegistry } from "../interfaces/IIdentityRegistry.sol";
 import { IDividendAware } from "../interfaces/IDividendAware.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
-import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 
 /**
  * @title IdentityRegistry
  * @author Steph Rayan
- * @notice Production implementation of the ERC-3643 compliant identity registry — v2.1.
+ * @notice UUPS upgradeable identity registry for ERC-3643 inspired RWA tokenization — v3.0.
  * @custom:security Educational / portfolio project. Internal review only. No external audit.
  *      Not production-ready without a Tier-1 audit, legal opinion and regulated entity.
  * @custom:standard ERC-3643 (T-REX) v4.x — Phase 1 simplified (no ERC-734/735 claims).
  */
-contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
+contract IdentityRegistry is
+    IIdentityRegistry,
+    Initializable,
+    AccessControlUpgradeable,
+    PausableUpgradeable,
+    UUPSUpgradeable
+{
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
 
     mapping(address => address) private _identities;
+    mapping(address => address) private _identityHolder;
     mapping(address => uint16) private _investorCountries;
     mapping(address => InvestorType) private _investorTypes;
     mapping(address => uint256) private _kycExpiries;
@@ -34,6 +43,19 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
     mapping(address => bool) private _isTrustedIssuer;
     mapping(address => uint256[]) private _trustedIssuerClaimTopics;
     mapping(address => uint256) private _trustedIssuerIndex;
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(address admin) external initializer nonZeroAddress(admin) {
+        __AccessControl_init();
+        __Pausable_init();
+
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(ISSUER_ROLE, admin);
+    }
 
     modifier nonZeroAddress(address addr) {
         if (addr == address(0)) {
@@ -54,11 +76,6 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
             revert IIdentityRegistry__InvalidIdentity(addr);
         }
         _;
-    }
-
-    constructor(address admin) nonZeroAddress(admin) {
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(ISSUER_ROLE, admin);
     }
 
     function identity(address investor) external view returns (address identityContract) {
@@ -114,7 +131,9 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
 
     function setToken(address _token) external onlyRole(DEFAULT_ADMIN_ROLE) nonZeroAddress(_token) {
         if (_token.code.length == 0) revert IIdentityRegistry__InvalidIdentity(_token);
+        address oldToken = token;
         token = _token;
+        emit TokenSet(oldToken, _token);
     }
 
     function setIdentityRegistryStorage(address identityRegistryStorage)
@@ -237,8 +256,12 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
         if (_identities[investor] != address(0)) {
             revert IIdentityRegistry__IdentityAlreadyExists(investor);
         }
+        if (_identityHolder[identityAddr] != address(0)) {
+            revert IIdentityRegistry__IdentityContractAlreadyAssigned(identityAddr, _identityHolder[identityAddr]);
+        }
 
         _identities[investor] = identityAddr;
+        _identityHolder[identityAddr] = investor;
         _investorCountries[investor] = country;
         _investorTypes[investor] = InvestorType.Retail;
         _kycExpiries[investor] = block.timestamp + 365 days;
@@ -266,11 +289,15 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
         if (_identities[investor] != address(0)) {
             revert IIdentityRegistry__IdentityAlreadyExists(investor);
         }
+        if (_identityHolder[identityAddr] != address(0)) {
+            revert IIdentityRegistry__IdentityContractAlreadyAssigned(identityAddr, _identityHolder[identityAddr]);
+        }
         if (kycExpiry_ <= block.timestamp) {
             revert IIdentityRegistry__KYCExpired(investor);
         }
 
         _identities[investor] = identityAddr;
+        _identityHolder[identityAddr] = investor;
         _investorCountries[investor] = country;
         _investorTypes[investor] = investorType_;
         _kycExpiries[investor] = kycExpiry_;
@@ -306,8 +333,17 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
         if (oldIdentity == address(0)) {
             revert IIdentityRegistry__IdentityNotRegistered(investor);
         }
+        if (identityAddr == oldIdentity) {
+            revert IIdentityRegistry__IdentityAlreadyExists(investor);
+        }
+        address existingInvestor = _identityHolder[identityAddr];
+        if (existingInvestor != address(0) && existingInvestor != investor) {
+            revert IIdentityRegistry__IdentityContractAlreadyAssigned(identityAddr, existingInvestor);
+        }
 
         _identities[investor] = identityAddr;
+        delete _identityHolder[oldIdentity];
+        _identityHolder[identityAddr] = investor;
         emit IdentityUpdated(investor, oldIdentity, identityAddr);
     }
 
@@ -337,17 +373,19 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
         if (identityAddr == address(0)) {
             revert IIdentityRegistry__IdentityNotRegistered(investor);
         }
-        if (token != address(0)) {
-            if (IERC20(token).balanceOf(investor) > 0) {
-                revert IIdentityRegistry__IdentityHasBalance(investor);
-            }
-            uint256 pending = IDividendAware(token).pendingDividendsOf(investor);
-            if (pending > 0) {
-                revert IIdentityRegistry__IdentityHasPendingDividends(investor);
-            }
+        if (token == address(0)) {
+            revert IIdentityRegistry__TokenNotSet();
+        }
+        if (IERC20(token).balanceOf(investor) > 0) {
+            revert IIdentityRegistry__IdentityHasBalance(investor);
+        }
+        uint256 pending = IDividendAware(token).pendingDividendsOf(investor);
+        if (pending > 0) {
+            revert IIdentityRegistry__IdentityHasPendingDividends(investor);
         }
 
         delete _identities[investor];
+        delete _identityHolder[identityAddr];
         delete _investorCountries[investor];
         delete _investorTypes[investor];
         delete _kycExpiries[investor];
@@ -362,7 +400,10 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
         uint16[] calldata countries
     ) external onlyRole(ISSUER_ROLE) whenNotPaused {
         uint256 length = investors.length;
-        if (length == 0 || length != identities.length || length != countries.length) {
+        if (length == 0) {
+            revert IIdentityRegistry__EmptyBatch();
+        }
+        if (length != identities.length || length != countries.length) {
             revert IIdentityRegistry__ArrayLengthMismatch();
         }
         if (length > 200) {
@@ -386,8 +427,12 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
             if (_identities[investor] != address(0)) {
                 revert IIdentityRegistry__IdentityAlreadyExists(investor);
             }
+            if (_identityHolder[identityAddr] != address(0)) {
+                revert IIdentityRegistry__IdentityContractAlreadyAssigned(identityAddr, _identityHolder[identityAddr]);
+            }
 
             _identities[investor] = identityAddr;
+            _identityHolder[identityAddr] = investor;
             _investorCountries[investor] = country;
             _investorTypes[investor] = InvestorType.Retail;
             _kycExpiries[investor] = block.timestamp + 365 days;
@@ -405,4 +450,15 @@ contract IdentityRegistry is IIdentityRegistry, AccessControl, Pausable {
     function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {
+        // Upgrade authorization restricted to admin (TimelockController in production).
+        (newImplementation);
+    }
+
+    /**
+     * @dev Reserved storage slots for future upgrades.
+     *      Do NOT remove or modify. New variables must be added above this gap.
+     */
+    uint256[50] private __gap;
 }

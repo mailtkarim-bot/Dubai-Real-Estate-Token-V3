@@ -4,15 +4,15 @@ import { abi as complianceAbi } from './abis/ComplianceEngine.json';
 
 export const CONTRACTS = {
   token: {
-    address: '0x2fAD3898ccBdc4A933170B0d551bd10b8b659fc6' as `0x${string}`,
+    address: '0x20BA3Dfa13295020b23758474ee831fD8E0f629B' as `0x${string}`,
     abi: tokenAbi,
   },
   registry: {
-    address: '0xECD85Ebd68a548705f902c6D244BfBA76f51F9Fc' as `0x${string}`,
+    address: '0xadCEa5d2d447a324C7577E48E0E2be83fBBC45e9' as `0x${string}`,
     abi: registryAbi,
   },
   compliance: {
-    address: '0x87b62081D607C022B2495D5B6555829fA84E33d6' as `0x${string}`,
+    address: '0xF5b23EFD5cb4C05D87FEF1E72766e08DAe5C54af' as `0x${string}`,
     abi: complianceAbi,
   },
   usdc: {

@@ -9,6 +9,7 @@ import "../../src/interfaces/IIdentityRegistry.sol";
 import "../mocks/MockUSDC.sol";
 import { IAccessControl } from "@openzeppelin/contracts/access/IAccessControl.sol";
 import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * @title MockIdentity
@@ -87,35 +88,72 @@ contract DubaiRealEstateTokenTest is Test {
         vm.prank(admin);
         usdc.mint(issuer, 1_000_000_000 * 10 ** usdcDecimals);
 
-        // Deploy IdentityRegistry
+        // Deploy IdentityRegistry proxy
         vm.startPrank(admin);
-        registry = new IdentityRegistry(admin);
+        registry = _deployRegistry(admin);
         registry.grantRole(registry.ISSUER_ROLE(), admin);
         registry.grantRole(registry.ISSUER_ROLE(), issuer);
 
-        // Deploy ComplianceEngine
-        compliance = new ComplianceEngine(admin, address(registry));
+        // Deploy ComplianceEngine proxy
+        compliance = _deployCompliance(admin, address(registry));
         compliance.grantRole(compliance.REGULATOR_ROLE(), regulator);
 
-        // Deploy Token
-        token = new DubaiRealEstateToken(
-            address(usdc), address(registry), address(compliance), "Dubai Real Estate", "DREIT", admin
-        );
+        // Deploy Token proxy
+        token = _deployToken(address(usdc), address(registry), address(compliance), admin);
         token.grantRole(token.ISSUER_ROLE(), issuer);
         token.grantRole(token.REGULATOR_ROLE(), regulator);
 
         // Link registry to token for balance checks in deleteIdentity
         registry.setToken(address(token));
+        // Bind token to compliance engine so stateful hooks can be called by the token only.
+        compliance.bindToken(address(token));
         vm.stopPrank();
 
-        // Deploy mock identity
+        // Deploy mock identities — each investor must have a unique identity contract.
         mockIdentity = new MockIdentity();
+        MockIdentity mockIdentityKarim = new MockIdentity();
+        MockIdentity mockIdentityBob = new MockIdentity();
 
         // Register investors in IdentityRegistry
         vm.startPrank(admin);
-        registry.registerIdentity(karim, address(mockIdentity), COUNTRY_UAE);
-        registry.registerIdentity(bob, address(mockIdentity), COUNTRY_FRANCE);
+        registry.registerIdentity(karim, address(mockIdentityKarim), COUNTRY_UAE);
+        registry.registerIdentity(bob, address(mockIdentityBob), COUNTRY_FRANCE);
         vm.stopPrank();
+    }
+
+    function _deployRegistry(address _admin) internal returns (IdentityRegistry) {
+        IdentityRegistry impl = new IdentityRegistry();
+        ERC1967Proxy proxy =
+            new ERC1967Proxy(address(impl), abi.encodeWithSelector(IdentityRegistry.initialize.selector, _admin));
+        return IdentityRegistry(address(proxy));
+    }
+
+    function _deployCompliance(address _admin, address _registry) internal returns (ComplianceEngine) {
+        ComplianceEngine impl = new ComplianceEngine();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl), abi.encodeWithSelector(ComplianceEngine.initialize.selector, _admin, _registry)
+        );
+        return ComplianceEngine(address(proxy));
+    }
+
+    function _deployToken(address _usdc, address _registry, address _compliance, address _admin)
+        internal
+        returns (DubaiRealEstateToken)
+    {
+        DubaiRealEstateToken impl = new DubaiRealEstateToken();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(
+                DubaiRealEstateToken.initialize.selector,
+                _usdc,
+                _registry,
+                _compliance,
+                "Dubai Real Estate",
+                "DREIT",
+                _admin
+            )
+        );
+        return DubaiRealEstateToken(address(proxy));
     }
 
     // ============================================
@@ -641,6 +679,30 @@ contract DubaiRealEstateTokenTest is Test {
     }
 
     // ============================================
+    // TEST 32b: BATCH MINT — Empty batch reverts
+    // ============================================
+    function test_BatchMint_EmptyBatch() public {
+        address[] memory recipients = new address[](0);
+        uint256[] memory amounts = new uint256[](0);
+
+        vm.prank(issuer);
+        vm.expectRevert(DubaiRealEstateToken.DREIT__EmptyBatch.selector);
+        token.batchMint(recipients, amounts);
+    }
+
+    // ============================================
+    // TEST 32c: BATCH MINT — Batch size > 100 reverts
+    // ============================================
+    function test_BatchMint_BatchSizeExceeded() public {
+        address[] memory recipients = new address[](101);
+        uint256[] memory amounts = new uint256[](101);
+
+        vm.prank(issuer);
+        vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__BatchSizeExceeded.selector, 101));
+        token.batchMint(recipients, amounts);
+    }
+
+    // ============================================
     // TEST 33: SWEEP DUST — Admin can sweep dust
     // ============================================
     function test_SweepDust() public {
@@ -679,12 +741,25 @@ contract DubaiRealEstateTokenTest is Test {
     // TEST 35: SET REGISTRY — Admin can update registry
     // ============================================
     function test_SetIdentityRegistry_ByAdmin() public {
-        address newRegistry = address(new IdentityRegistry(admin));
+        address newRegistry = address(_deployRegistry(admin));
 
         vm.prank(admin);
         token.setIdentityRegistry(newRegistry);
 
         assertEq(address(token.identityRegistry()), newRegistry);
+    }
+
+    // ============================================
+    // TEST 35b: SET COMPLIANCE — Admin can update engine
+    // ============================================
+    function test_SetComplianceEngine_ByAdmin() public {
+        ComplianceEngine newEngine = _deployCompliance(admin, address(registry));
+        address newEngineAddr = address(newEngine);
+
+        vm.prank(admin);
+        token.setComplianceEngine(newEngineAddr);
+
+        assertEq(address(token.complianceEngine()), newEngineAddr);
     }
 
     // ============================================
@@ -749,7 +824,7 @@ contract DubaiRealEstateTokenTest is Test {
     // ============================================
     function test_SetComplianceEngine_ByNonAdmin() public {
         bytes32 adminRole = token.DEFAULT_ADMIN_ROLE();
-        address newEngine = address(new ComplianceEngine(admin, address(registry)));
+        address newEngine = address(_deployCompliance(admin, address(registry)));
 
         vm.prank(hacker);
         vm.expectRevert(
@@ -890,44 +965,122 @@ contract DubaiRealEstateTokenTest is Test {
     }
 
     // ============================================
-    // TESTS CONSTRUCTOR — 8 branches manquantes
+    // TESTS INITIALIZE — 8 branches
     // ============================================
-    function test_Constructor_ZeroAddressStablecoin() public {
+    function test_Initialize_ZeroAddressStablecoin() public {
+        DubaiRealEstateToken impl = new DubaiRealEstateToken();
         vm.expectRevert(DubaiRealEstateToken.DREIT__ZeroAddress.selector);
-        new DubaiRealEstateToken(address(0), address(registry), address(compliance), "DREIT", "DREIT", admin);
+        new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(
+                DubaiRealEstateToken.initialize.selector,
+                address(0),
+                address(registry),
+                address(compliance),
+                "DREIT",
+                "DREIT",
+                admin
+            )
+        );
     }
 
-    function test_Constructor_ZeroAddressRegistry() public {
+    function test_Initialize_ZeroAddressRegistry() public {
+        DubaiRealEstateToken impl = new DubaiRealEstateToken();
         vm.expectRevert(DubaiRealEstateToken.DREIT__ZeroAddress.selector);
-        new DubaiRealEstateToken(address(usdc), address(0), address(compliance), "DREIT", "DREIT", admin);
+        new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(
+                DubaiRealEstateToken.initialize.selector,
+                address(usdc),
+                address(0),
+                address(compliance),
+                "DREIT",
+                "DREIT",
+                admin
+            )
+        );
     }
 
-    function test_Constructor_ZeroAddressEngine() public {
+    function test_Initialize_ZeroAddressEngine() public {
+        DubaiRealEstateToken impl = new DubaiRealEstateToken();
         vm.expectRevert(DubaiRealEstateToken.DREIT__ZeroAddress.selector);
-        new DubaiRealEstateToken(address(usdc), address(registry), address(0), "DREIT", "DREIT", admin);
+        new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(
+                DubaiRealEstateToken.initialize.selector,
+                address(usdc),
+                address(registry),
+                address(0),
+                "DREIT",
+                "DREIT",
+                admin
+            )
+        );
     }
 
-    function test_Constructor_ZeroAddressAdmin() public {
+    function test_Initialize_ZeroAddressAdmin() public {
+        DubaiRealEstateToken impl = new DubaiRealEstateToken();
         vm.expectRevert(DubaiRealEstateToken.DREIT__ZeroAddress.selector);
-        new DubaiRealEstateToken(address(usdc), address(registry), address(compliance), "DREIT", "DREIT", address(0));
+        new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(
+                DubaiRealEstateToken.initialize.selector,
+                address(usdc),
+                address(registry),
+                address(compliance),
+                "DREIT",
+                "DREIT",
+                address(0)
+            )
+        );
     }
 
-    function test_Constructor_EOAStablecoin() public {
+    function test_Initialize_EOAStablecoin() public {
         address eoa = makeAddr("eoa");
+        DubaiRealEstateToken impl = new DubaiRealEstateToken();
         vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__NotContract.selector, eoa));
-        new DubaiRealEstateToken(eoa, address(registry), address(compliance), "DREIT", "DREIT", admin);
+        new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(
+                DubaiRealEstateToken.initialize.selector,
+                eoa,
+                address(registry),
+                address(compliance),
+                "DREIT",
+                "DREIT",
+                admin
+            )
+        );
     }
 
-    function test_Constructor_EOARegistry() public {
+    function test_Initialize_EOARegistry() public {
         address eoa = makeAddr("eoa");
+        DubaiRealEstateToken impl = new DubaiRealEstateToken();
         vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__NotContract.selector, eoa));
-        new DubaiRealEstateToken(address(usdc), eoa, address(compliance), "DREIT", "DREIT", admin);
+        new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(
+                DubaiRealEstateToken.initialize.selector,
+                address(usdc),
+                eoa,
+                address(compliance),
+                "DREIT",
+                "DREIT",
+                admin
+            )
+        );
     }
 
-    function test_Constructor_EOAEngine() public {
+    function test_Initialize_EOAEngine() public {
         address eoa = makeAddr("eoa");
+        DubaiRealEstateToken impl = new DubaiRealEstateToken();
         vm.expectRevert(abi.encodeWithSelector(DubaiRealEstateToken.DREIT__NotContract.selector, eoa));
-        new DubaiRealEstateToken(address(usdc), address(registry), eoa, "DREIT", "DREIT", admin);
+        new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(
+                DubaiRealEstateToken.initialize.selector, address(usdc), address(registry), eoa, "DREIT", "DREIT", admin
+            )
+        );
     }
 
     // ============================================
@@ -1399,6 +1552,110 @@ contract DubaiRealEstateTokenTest is Test {
 
         // No DividendSynced event should have been emitted for Karim (unclaimed was 0)
         assertEq(token.getClaimableDividends(karim), 0);
+    }
+
+    // ============================================
+    // TEST 63: BURN — Compliance rejects when sender country restricted
+    // ============================================
+    function test_Burn_ComplianceRejects() public {
+        _mintToKarimAndBob();
+
+        // Restrict UAE (Karim's country) so KYC passes but compliance fails
+        vm.prank(admin);
+        compliance.restrictCountry(COUNTRY_UAE);
+
+        vm.prank(karim);
+        vm.expectRevert(
+            abi.encodeWithSelector(DubaiRealEstateToken.DREIT__TransferNotCompliant.selector, karim, address(0))
+        );
+        token.burn(100e18);
+    }
+
+    // ============================================
+    // TEST 64: PAUSE — Emits Paused event
+    // ============================================
+    function test_Pause_EmitsEvent() public {
+        vm.expectEmit(false, false, false, true);
+        emit Pausable.Paused(admin);
+
+        vm.prank(admin);
+        token.pause();
+    }
+
+    // ============================================
+    // TEST 65: UNPAUSE — Emits Unpaused event
+    // ============================================
+    function test_Unpause_EmitsEvent() public {
+        vm.prank(admin);
+        token.pause();
+
+        vm.expectEmit(false, false, false, true);
+        emit Pausable.Unpaused(admin);
+
+        vm.prank(admin);
+        token.unpause();
+    }
+
+    // ============================================
+    // TEST 66: CONSTRUCTOR — Disable initializers on implementation
+    // ============================================
+    function test_Constructor_DisableInitializers() public {
+        DubaiRealEstateToken impl = new DubaiRealEstateToken();
+        vm.expectRevert();
+        impl.initialize(
+            address(usdc), address(registry), address(compliance), "DREIT", "DREIT", admin
+        );
+    }
+
+    // ============================================
+    // TEST 67: _syncDividends — lastClaimed == 0, balance > 0, initialUnclaimed == 0
+    // ============================================
+    function test_SyncDividends_InitialUnclaimedZero() public {
+        address ali = makeAddr("ali");
+        vm.prank(admin);
+        registry.registerIdentity(ali, address(mockIdentity), COUNTRY_UAE);
+
+        // Mint tiny amount so that dividend share rounds to 0
+        vm.startPrank(issuer);
+        token.mint(ali, 1); // 1 wei token
+        vm.stopPrank();
+
+        // Distribute 1 USDC with totalSupply = 1 → dividendPerToken = 1e18
+        // initialUnclaimed for ali = (1 * 1e18) / 1e18 = 1, not zero.
+        // Instead distribute 0.5 USDC but that reverts. Use a supply of 2e18 and 1 wei dividend.
+        // Simpler: mint another holder so totalSupply = 2, distribute 1 wei USDC → dividendPerToken = 0 (reverts).
+        // We need dividendPerToken > 0 but ali's share rounds to 0.
+        // totalSupply = 2, distribute 1 USDC → dividendPerToken = 5e17, ali share = (1 * 5e17)/1e18 = 0.
+        address zoe = makeAddr("zoe");
+        vm.startPrank(admin);
+        registry.registerIdentity(zoe, address(new MockIdentity()), COUNTRY_FRANCE);
+        vm.stopPrank();
+        vm.startPrank(issuer);
+        token.mint(zoe, 1);
+        usdc.approve(address(token), 1);
+        token.distributeDividends(1);
+        vm.stopPrank();
+
+        // Ali transfers her 1 wei to Zoe; _syncDividends(ali) with lastClaimed==0,
+        // balance=1, dividendPerToken=5e17 -> initialUnclaimed = 0.
+        vm.prank(ali);
+        token.transfer(zoe, 1);
+
+        assertEq(token.getClaimableDividends(ali), 0);
+    }
+
+    // ============================================
+    // TEST 68: pendingDividendsOf — delta == 0 returns pending only
+    // ============================================
+    function test_PendingDividendsOf_DeltaZero() public {
+        _mintToKarimAndBob();
+        _distributeDividends(10_000 * 1e6);
+
+        vm.prank(karim);
+        token.claimDividends();
+
+        // After claim, lastClaimed == dividendPerToken, so delta == 0
+        assertEq(token.pendingDividendsOf(karim), 0, "Delta=0 must return only pending (0)");
     }
 
     // ============================================

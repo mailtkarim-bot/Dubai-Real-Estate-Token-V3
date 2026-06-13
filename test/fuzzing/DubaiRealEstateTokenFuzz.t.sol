@@ -8,6 +8,7 @@ import { ComplianceEngine } from "../../src/compliance/ComplianceEngine.sol";
 import { MockUSDC } from "../mocks/MockUSDC.sol";
 import { MockIdentity } from "../mocks/MockIdentity.sol";
 import { IIdentityRegistry } from "../../src/interfaces/IIdentityRegistry.sol";
+import { ERC1967Proxy } from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * @title DubaiRealEstateTokenFuzzTest
@@ -40,11 +41,9 @@ contract DubaiRealEstateTokenFuzzTest is Test {
         vm.startPrank(admin);
 
         usdc = new MockUSDC();
-        registry = new IdentityRegistry(admin);
-        compliance = new ComplianceEngine(admin, address(registry));
-        token = new DubaiRealEstateToken(
-            address(usdc), address(registry), address(compliance), "Dubai Real Estate", "DREIT", admin
-        );
+        registry = _deployRegistry(admin);
+        compliance = _deployCompliance(admin, address(registry));
+        token = _deployToken(address(usdc), address(registry), address(compliance), admin);
 
         token.grantRole(token.ISSUER_ROLE(), issuer);
         token.grantRole(token.REGULATOR_ROLE(), regulator);
@@ -53,6 +52,41 @@ contract DubaiRealEstateTokenFuzzTest is Test {
         registry.setToken(address(token));
 
         vm.stopPrank();
+    }
+
+    function _deployRegistry(address _admin) internal returns (IdentityRegistry) {
+        IdentityRegistry impl = new IdentityRegistry();
+        ERC1967Proxy proxy =
+            new ERC1967Proxy(address(impl), abi.encodeWithSelector(IdentityRegistry.initialize.selector, _admin));
+        return IdentityRegistry(address(proxy));
+    }
+
+    function _deployCompliance(address _admin, address _registry) internal returns (ComplianceEngine) {
+        ComplianceEngine impl = new ComplianceEngine();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl), abi.encodeWithSelector(ComplianceEngine.initialize.selector, _admin, _registry)
+        );
+        return ComplianceEngine(address(proxy));
+    }
+
+    function _deployToken(address _usdc, address _registry, address _compliance, address _admin)
+        internal
+        returns (DubaiRealEstateToken)
+    {
+        DubaiRealEstateToken impl = new DubaiRealEstateToken();
+        ERC1967Proxy proxy = new ERC1967Proxy(
+            address(impl),
+            abi.encodeWithSelector(
+                DubaiRealEstateToken.initialize.selector,
+                _usdc,
+                _registry,
+                _compliance,
+                "Dubai Real Estate",
+                "DREIT",
+                _admin
+            )
+        );
+        return DubaiRealEstateToken(address(proxy));
     }
 
     // ============================================

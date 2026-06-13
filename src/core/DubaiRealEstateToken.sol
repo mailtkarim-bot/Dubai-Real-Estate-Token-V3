@@ -1,11 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.28;
 
-import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import { ERC20Upgradeable } from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import { AccessControl } from "@openzeppelin/contracts/access/AccessControl.sol";
-import { Pausable } from "@openzeppelin/contracts/utils/Pausable.sol";
+import { AccessControlUpgradeable } from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import { PausableUpgradeable } from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+// OpenZeppelin v5 ReentrancyGuard uses ERC-7201 namespaced storage and is stateless,
+// so it is safe to use in UUPS upgradeable contracts even though it lives in the non-upgradeable package.
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import { UUPSUpgradeable } from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import { Initializable } from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { IIdentityRegistry } from "../interfaces/IIdentityRegistry.sol";
 import { IComplianceEngine } from "../interfaces/IComplianceEngine.sol";
@@ -14,13 +18,21 @@ import { IDividendAware } from "../interfaces/IDividendAware.sol";
 /**
  * @title DubaiRealEstateToken
  * @author Steph Rayan
- * @notice ERC-3643 inspired permissioned security token for Dubai RWA real estate — v3.1.
+ * @notice UUPS upgradeable ERC-3643 inspired permissioned security token for Dubai RWA real estate — v4.0.
  * @custom:security Educational / portfolio project. Internal review only. No external audit.
  *      Not production-ready without a Tier-1 audit, legal opinion and regulated entity.
  *      Dust auto-redistributed. All transfers gated by KYC + Compliance.
  * @dev Dividends use Pull-over-Push with retroactive-gain protection.
  */
-contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard, IDividendAware {
+contract DubaiRealEstateToken is
+    Initializable,
+    ERC20Upgradeable,
+    AccessControlUpgradeable,
+    PausableUpgradeable,
+    ReentrancyGuard,
+    UUPSUpgradeable,
+    IDividendAware
+{
     using SafeERC20 for IERC20;
 
     bytes32 public constant ISSUER_ROLE = keccak256("ISSUER_ROLE");
@@ -28,7 +40,7 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
 
     uint256 public constant MAX_SUPPLY = 50_000 * 10 ** 18;
 
-    IERC20 public immutable stablecoin;
+    IERC20 public stablecoin;
     IIdentityRegistry public identityRegistry;
     IComplianceEngine public complianceEngine;
 
@@ -64,6 +76,8 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
     error DREIT__InsufficientBalance();
     error DREIT__AccountFrozen(address account);
     error DREIT__ArrayLengthMismatch();
+    error DREIT__EmptyBatch();
+    error DREIT__BatchSizeExceeded(uint256 size);
 
     modifier nonZeroAddress(address addr) {
         if (addr == address(0)) revert DREIT__ZeroAddress();
@@ -75,14 +89,19 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
         _;
     }
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
         address _stablecoin,
         address _identityRegistry,
         address _complianceEngine,
         string memory _name,
         string memory _symbol,
         address _admin
-    ) ERC20(_name, _symbol) {
+    ) external initializer {
         if (_stablecoin == address(0)) revert DREIT__ZeroAddress();
         if (_identityRegistry == address(0)) revert DREIT__ZeroAddress();
         if (_complianceEngine == address(0)) revert DREIT__ZeroAddress();
@@ -91,6 +110,10 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
         if (_stablecoin.code.length == 0) revert DREIT__NotContract(_stablecoin);
         if (_identityRegistry.code.length == 0) revert DREIT__NotContract(_identityRegistry);
         if (_complianceEngine.code.length == 0) revert DREIT__NotContract(_complianceEngine);
+
+        __ERC20_init(_name, _symbol);
+        __AccessControl_init();
+        __Pausable_init();
 
         stablecoin = IERC20(_stablecoin);
         identityRegistry = IIdentityRegistry(_identityRegistry);
@@ -138,8 +161,9 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
         nonReentrant
     {
         uint256 length = recipients.length;
+        if (length == 0) revert DREIT__EmptyBatch();
         if (length != amounts.length) revert DREIT__ArrayLengthMismatch();
-        if (length > 100) revert DREIT__ArrayLengthMismatch();
+        if (length > 100) revert DREIT__BatchSizeExceeded(length);
 
         uint256 total;
         for (uint256 i; i < length; ++i) {
@@ -385,6 +409,14 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
         }
     }
 
+    function transfer(address to, uint256 value) public override nonReentrant returns (bool) {
+        return super.transfer(to, value);
+    }
+
+    function transferFrom(address from, address to, uint256 value) public override nonReentrant returns (bool) {
+        return super.transferFrom(from, to, value);
+    }
+
     function setIdentityRegistry(address _registry) external onlyRole(DEFAULT_ADMIN_ROLE) nonZeroAddress(_registry) {
         if (_registry.code.length == 0) revert DREIT__NotContract(_registry);
         address oldRegistry = address(identityRegistry);
@@ -436,4 +468,15 @@ contract DubaiRealEstateToken is ERC20, AccessControl, Pausable, ReentrancyGuard
 
         return synced + ((balance * delta) / 1e18);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {
+        // Upgrade authorization restricted to admin (TimelockController in production).
+        (newImplementation);
+    }
+
+    /**
+     * @dev Reserved storage slots for future upgrades.
+     *      Do NOT remove or modify. New variables must be added above this gap.
+     */
+    uint256[50] private __gap;
 }

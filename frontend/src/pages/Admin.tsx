@@ -39,6 +39,7 @@ export default function Admin() {
   const [mintAmount, setMintAmount] = useState('');
   const [dividendAmount, setDividendAmount] = useState('');
   const [freezeTarget, setFreezeTarget] = useState('');
+  const [freezeReason, setFreezeReason] = useState('');
 
   const isLoading = isPending || isConfirming;
 
@@ -239,8 +240,8 @@ export default function Admin() {
           <Snowflake size={20} />
           Freeze / Unfreeze Investor
         </h3>
-        <div className="flex items-end gap-4">
-          <div className="flex-1">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <div>
             <label className="block text-sm text-gray-400 mb-1">Investor Address</label>
             <input
               type="text"
@@ -251,10 +252,23 @@ export default function Admin() {
               data-testid="freeze-target-input"
             />
           </div>
+          <div>
+            <label className="block text-sm text-gray-400 mb-1">Reason</label>
+            <input
+              type="text"
+              value={freezeReason}
+              onChange={(e) => setFreezeReason(e.target.value)}
+              placeholder="Regulatory freeze"
+              className="input-dark w-full"
+              data-testid="freeze-reason-input"
+            />
+          </div>
+        </div>
+        <div className="flex gap-4">
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            onClick={() => validateAndWrite('freezeInvestor', CONTRACTS.compliance, [freezeTarget as `0x${string}`], [addressSchema])}
+            onClick={() => validateAndWrite('freezeInvestor', CONTRACTS.compliance, [freezeTarget as `0x${string}`, freezeReason || 'Regulatory freeze'], [addressSchema])}
             disabled={isLoading || !freezeTarget}
             className="btn-outline-gold border-red-400 text-red-400 hover:bg-red-400/10"
             data-testid="freeze-button"

@@ -70,21 +70,21 @@ export default function Home() {
           whileHover={{ scale: 1.05 }}
           className="card text-center"
         >
-          <div className="text-3xl font-bold text-gold-300">3</div>
+          <div className="text-3xl font-bold text-gold-300">7</div>
           <div className="text-gray-400">Contracts Deployed</div>
         </motion.div>
         <motion.div
           whileHover={{ scale: 1.05 }}
           className="card text-center"
         >
-          <div className="text-3xl font-bold text-gold-300">224</div>
+          <div className="text-3xl font-bold text-gold-300">282</div>
           <div className="text-gray-400">Tests Passing</div>
         </motion.div>
         <motion.div
           whileHover={{ scale: 1.05 }}
           className="card text-center"
         >
-          <div className="text-3xl font-bold text-gold-300">96.8%</div>
+          <div className="text-3xl font-bold text-gold-300">96.4%</div>
           <div className="text-gray-400">Core Coverage</div>
         </motion.div>
       </motion.section>
@@ -166,9 +166,9 @@ export default function Home() {
         <h2 className="text-2xl font-bold text-gold-300 mb-6">Deployed Contracts</h2>
         <div className="space-y-4">
           {[
-            { name: 'DubaiRealEstateToken', addr: '0x2fAD3898ccBdc4A933170B0d551bd10b8b659fc6' },
-            { name: 'IdentityRegistry', addr: '0xECD85Ebd68a548705f902c6D244BfBA76f51F9Fc' },
-            { name: 'ComplianceEngine', addr: '0x87b62081D607C022B2495D5B6555829fA84E33d6' },
+            { name: 'DubaiRealEstateToken', addr: '0x20BA3Dfa13295020b23758474ee831fD8E0f629B' },
+            { name: 'IdentityRegistry', addr: '0xadCEa5d2d447a324C7577E48E0E2be83fBBC45e9' },
+            { name: 'ComplianceEngine', addr: '0xF5b23EFD5cb4C05D87FEF1E72766e08DAe5C54af' },
           ].map((c) => (
             <motion.div
               key={c.addr}
