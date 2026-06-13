@@ -1,0 +1,45 @@
+# Compiler files
+cache/
+out/
+
+# Commonly ignored directories
+.logs/
+.ignore/
+
+# Ignores development broadcast logs
+!/broadcast
+/broadcast/*/31337/
+/broadcast/**/dry-run/
+
+# Dotenv file
+.env
+.env.*
+!.env.example
+
+# Coverage & temp files
+*.info
+lcov*
+coverage-*/
+.gas-snapshot-real
+foundry.lock
+
+# IDE / OS
+.DS_Store
+*.swp
+*.swo
+*~
+.~lock.*
+
+# Logs
+anvil.log
+*.log
+
+# Keep docs/screenshots and ARCHITECTURE.md
+docs/*
+!docs/screenshots/
+!docs/ARCHITECTURE.md
+
+# Dependencies (install with forge install)
+lib/
+frontend/node_modules/
+frontend/dist/
