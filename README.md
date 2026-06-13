@@ -10,7 +10,7 @@
 ![Invariant](https://img.shields.io/badge/Invariant-6%2F6%20%C3%97%20256%20runs-brightgreen)
 ![Coverage](https://img.shields.io/badge/Coverage-96.4%25%20core%20contracts-2ECC71)
 ![Sepolia](https://img.shields.io/badge/Sepolia-Deployed%20%26%20Verified-blue)
-[![Frontend](https://img.shields.io/badge/Frontend-Live%20Demo-gold)](https://mailtkarim-bot.github.io/dubai-real-estate-v2/)
+[![Frontend](https://img.shields.io/badge/Frontend-Live%20Demo-gold)](https://mailtkarim-bot.github.io/Dubai-Real-Estate-Token-V3/)
 ![License](https://img.shields.io/badge/License-MIT-F4D03F)
 ![Internal Review](https://img.shields.io/badge/Internal%20Review-Passed-yellow)
 
@@ -20,7 +20,7 @@ Built with Solidity 0.8.28 and OpenZeppelin v5, DREIT demonstrates on-chain iden
 
 <div align="center">
 
-[![View Live Demo](https://img.shields.io/badge/🔗%20View%20Live%20Demo%20on%20GitHub%20Pages-2C2C2C?style=for-the-badge&logo=github&logoColor=white)](https://mailtkarim-bot.github.io/dubai-real-estate-v2/)
+[![View Live Demo](https://img.shields.io/badge/🔗%20View%20Live%20Demo%20on%20GitHub%20Pages-2C2C2C?style=for-the-badge&logo=github&logoColor=white)](https://mailtkarim-bot.github.io/Dubai-Real-Estate-Token-V3/)
 
 </div>
 
@@ -90,13 +90,13 @@ A production-grade React interface is deployed on **GitHub Pages** and connected
 
 <div align="center">
 
-[![View Live Demo](https://img.shields.io/badge/🔗%20Open%20Live%20Demo-181717?style=for-the-badge&logo=github&logoColor=white)](https://mailtkarim-bot.github.io/dubai-real-estate-v2/)
+[![View Live Demo](https://img.shields.io/badge/🔗%20Open%20Live%20Demo-181717?style=for-the-badge&logo=github&logoColor=white)](https://mailtkarim-bot.github.io/Dubai-Real-Estate-Token-V3/)
 
 </div>
 
 | Resource | Details |
 |----------|---------|
-| **Live DApp** | [https://mailtkarim-bot.github.io/dubai-real-estate-v2/](https://mailtkarim-bot.github.io/dubai-real-estate-v2/) |
+| **Live DApp** | [https://mailtkarim-bot.github.io/Dubai-Real-Estate-Token-V3/](https://mailtkarim-bot.github.io/Dubai-Real-Estate-Token-V3/) |
 | **Frontend Code** | [`frontend/`](./frontend) |
 | **Network** | Sepolia Testnet (Chain ID: 11155111) |
 | **Wallet** | MetaMask, Rainbow, Coinbase Wallet (via RainbowKit + wagmi) |
