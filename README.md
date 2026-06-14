@@ -33,6 +33,7 @@ Built with Solidity 0.8.28 and OpenZeppelin v5, DREIT demonstrates on-chain iden
 
 - **282 Foundry tests pass** — unit, integration, fuzzing (8 × 10k runs), and invariant (6 × 256 runs) campaigns.
 - **96.4% core contract coverage** — all core functions at 100%, branches at ~94%.
+- **7-tool automated audit readiness gate** — verified as **READY FOR PROFESSIONAL AUDIT** by [`foundry-audit-readiness`](https://github.com/mailtkarim-bot/foundry-audit-readiness) (Slither, Aderyn, Solhint, Semgrep, Mythril, Halmos, SMTChecker).
 - **Internal security audit (V3 Phase 2)** — all High/Medium findings remediated; fixes include hook access control, identity deletion safety, whitelist symmetry, and reentrancy guards.
 - **UUPS upgradeable architecture** — proxies for `IdentityRegistry`, `ComplianceEngine`, and `DubaiRealEstateToken` with upgrade authorization via Timelock.
 - **TimelockController governance** — 48-hour delay on admin actions, with proposer/executor roles designed for a Gnosis Safe.
@@ -182,25 +183,38 @@ During development, the following issues were identified and corrected in the co
 
 ## 🔍 Audit Readiness
 
-This project is verified as **READY FOR PROFESSIONAL AUDIT** by [`foundry-audit-readiness`](https://github.com/mailtkarim-bot/foundry-audit-readiness), a Foundry-native quality gate that checks static analysis, coverage, invariants, NatSpec documentation, and compiler warnings before engaging an auditor.
+This project is verified as **READY FOR PROFESSIONAL AUDIT** by **[`foundry-audit-readiness`](https://github.com/mailtkarim-bot/foundry-audit-readiness)** — a free, open-source quality gate that runs **7 Solidity security tools** plus Foundry coverage, invariants, NatSpec, and compiler checks in a single command.
 
-Latest automated check (run against `src/` only):
+[![Audit Readiness](https://img.shields.io/badge/Audit%20Readiness-Ready%20For%20Professional%20Audit-brightgreen)](https://github.com/mailtkarim-bot/foundry-audit-readiness)
+[![foundry-audit-readiness](https://img.shields.io/badge/Built%20with-foundry--audit--readiness-blue)](https://github.com/mailtkarim-bot/foundry-audit-readiness)
 
-```text
-Static Analysis (Slither): PASS — 0 critical / 0 high / 0 medium / 0 low
-Line Coverage:        99.4%  (threshold: 90%)
-Branch Coverage:      95.1%  (threshold: 85%)
-Function Coverage:   100.0%  (threshold: 100%)
-Invariant Tests:       6/6   all passing
-NatSpec:             2/2 public, 117/117 external documented
-Compiler Warnings:   None in source contracts
-Status:              READY FOR PROFESSIONAL AUDIT
-```
+### Latest automated check
+
+Run against `src/` only, with all 7 static-analysis tools enabled:
+
+| Gate | Result |
+|------|--------|
+| **Slither** (Trail of Bits) | ✅ 0 critical / 0 high / 0 medium / 0 low |
+| **Aderyn** (Cyfrin) | ✅ 0 findings |
+| **Solhint** | ✅ 0 findings |
+| **Semgrep** | ✅ 0 findings |
+| **Mythril** (symbolic execution) | ✅ 0 findings |
+| **Halmos** (formal verification) | ✅ 0 findings |
+| **SMTChecker** (solc) | ✅ 0 findings |
+| **Line Coverage** | ✅ 99.4% (threshold 90%) |
+| **Branch Coverage** | ✅ 92.8% (threshold 85%) |
+| **Function Coverage** | ✅ 100.0% (threshold 100%) |
+| **Invariant Tests** | ✅ 6/6 passing |
+| **NatSpec** | ✅ 2/2 public, 117/117 external documented |
+| **Compiler Warnings (src/)** | ✅ None |
+| **Final Status** | **🟢 READY FOR PROFESSIONAL AUDIT** |
+
+📄 **Full generated report:** [`AUDIT_READINESS_REPORT.md`](./AUDIT_READINESS_REPORT.md)
 
 > **Tool:** [github.com/mailtkarim-bot/foundry-audit-readiness](https://github.com/mailtkarim-bot/foundry-audit-readiness)  
-> **Note:** This is a readiness check, not a replacement for a Tier-1 external security audit.
+> **Note:** This is an automated readiness check. It does not replace a Tier-1 external security audit.
 
-Run the check yourself:
+### Run the check yourself
 
 ```bash
 # 1. Install the audit-readiness tool
@@ -208,11 +222,12 @@ git clone https://github.com/mailtkarim-bot/foundry-audit-readiness.git
 cd foundry-audit-readiness
 pip install -r requirements.txt
 
-# 2. Run it against this repo
+# 2. Run it against this repo (generates both .md and .html reports)
 python -m audit_readiness \
   --target /path/to/Dubai-Real-Estate-Token-V3 \
-  --output audit-report.html \
-  --format html
+  --output audit-report
+
+# 3. Open audit-report.html in your browser
 ```
 
 ---
