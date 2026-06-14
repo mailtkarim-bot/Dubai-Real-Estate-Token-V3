@@ -40,6 +40,7 @@ contract ComplianceEngine is
     event WhitelistEnabled(bool enabled, uint256 timestamp, address indexed actor);
     event WhitelistUpdated(address indexed account, bool status, address indexed actor);
     event IdentityRegistrySet(address indexed registry);
+    event UpgradeAuthorized(address indexed newImplementation, address indexed actor);
 
     error ComplianceEngine__ZeroAddress();
     error ComplianceEngine__TokenMismatch();
@@ -67,6 +68,11 @@ contract ComplianceEngine is
         _disableInitializers();
     }
 
+    /**
+     * @notice Initializes the compliance engine.
+     * @param admin The address to receive the default admin and regulator roles.
+     * @param identityRegistryAddr The identity registry contract address.
+     */
     function initialize(address admin, address identityRegistryAddr)
         external
         initializer
@@ -81,14 +87,17 @@ contract ComplianceEngine is
         identityRegistry = IIdentityRegistry(identityRegistryAddr);
     }
 
+    /// @inheritdoc IComplianceEngine
     function isCompliant(address from, address to, uint256 amount) external view returns (bool) {
         return _checkRules(from, to, amount);
     }
 
+    /// @inheritdoc IComplianceEngine
     function canCreate(address to, uint256 amount) external view returns (bool) {
         return _checkRules(address(0), to, amount);
     }
 
+    /// @inheritdoc IComplianceEngine
     function canDestroy(address from, uint256 amount) external view returns (bool) {
         return _checkRules(from, address(0), amount);
     }
@@ -130,6 +139,7 @@ contract ComplianceEngine is
         return true;
     }
 
+    /// @inheritdoc IComplianceEngine
     function transferred(
         address,
         /*from*/
@@ -145,6 +155,7 @@ contract ComplianceEngine is
         // Only the bound token may call this hook to prevent state manipulation.
     }
 
+    /// @inheritdoc IComplianceEngine
     function created(
         address,
         /*to*/
@@ -158,6 +169,7 @@ contract ComplianceEngine is
         // Only the bound token may call this hook to prevent state manipulation.
     }
 
+    /// @inheritdoc IComplianceEngine
     function destroyed(
         address,
         /*from*/
@@ -171,54 +183,89 @@ contract ComplianceEngine is
         // Only the bound token may call this hook to prevent state manipulation.
     }
 
+    /// @inheritdoc IComplianceEngine
     function freezeInvestor(address investor, string calldata reason) external onlyRole(REGULATOR_ROLE) {
         _frozen[investor] = true;
         emit InvestorFrozen(investor, reason, block.timestamp, msg.sender);
     }
 
+    /// @inheritdoc IComplianceEngine
     function unfreezeInvestor(address investor) external onlyRole(REGULATOR_ROLE) {
         _frozen[investor] = false;
         emit InvestorUnfrozen(investor, block.timestamp, msg.sender);
     }
 
+    /// @inheritdoc IComplianceEngine
     function isFrozen(address investor) external view returns (bool) {
         return _frozen[investor];
     }
 
+    /**
+     * @notice Restricts all transfers from/to investors of a given country.
+     * @param country The country code to restrict.
+     */
     function restrictCountry(uint16 country) external onlyRole(REGULATOR_ROLE) validCountry(country) {
         _restrictedCountries[country] = true;
         emit CountryRestricted(country, block.timestamp, msg.sender);
     }
 
+    /**
+     * @notice Removes a country restriction.
+     * @param country The country code to unrestrict.
+     */
     function unrestrictCountry(uint16 country) external onlyRole(REGULATOR_ROLE) validCountry(country) {
         _restrictedCountries[country] = false;
         emit CountryUnrestricted(country, block.timestamp, msg.sender);
     }
 
+    /**
+     * @notice Returns whether a country is currently restricted.
+     * @param country The country code to check.
+     * @return True if restricted, false otherwise.
+     */
     function isCountryRestricted(uint16 country) external view returns (bool) {
         return _restrictedCountries[country];
     }
 
+    /**
+     * @notice Enables or disables the whitelist mode.
+     * @param enabled True to enable whitelist, false to disable.
+     */
     function setWhitelistEnabled(bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
         whitelistEnabled = enabled;
         emit WhitelistEnabled(enabled, block.timestamp, msg.sender);
     }
 
+    /**
+     * @notice Adds or removes an account from the whitelist.
+     * @param account The account address.
+     * @param status True to whitelist, false to remove.
+     */
     function setWhitelisted(address account, bool status) external onlyRole(REGULATOR_ROLE) {
         _whitelisted[account] = status;
         emit WhitelistUpdated(account, status, msg.sender);
     }
 
+    /**
+     * @notice Returns whether an account is whitelisted.
+     * @param account The account address.
+     * @return True if whitelisted, false otherwise.
+     */
     function isWhitelisted(address account) external view returns (bool) {
         return _whitelisted[account];
     }
 
+    /**
+     * @notice Sets the identity registry contract.
+     * @param registry The identity registry address.
+     */
     function setIdentityRegistry(address registry) external onlyRole(DEFAULT_ADMIN_ROLE) nonZeroAddress(registry) {
         if (registry.code.length == 0) revert ComplianceEngine__NotContract(registry);
         identityRegistry = IIdentityRegistry(registry);
         emit IdentityRegistrySet(registry);
     }
 
+    /// @inheritdoc IComplianceEngine
     function bindToken(address _token) external override onlyRole(DEFAULT_ADMIN_ROLE) nonZeroAddress(_token) {
         token = _token;
         emit TokenBound(_token);
@@ -235,33 +282,44 @@ contract ComplianceEngine is
         emit TokenUnbound(_token);
     }
 
+    /// @inheritdoc IComplianceEngine
     function addModule(address module) external override onlyRole(DEFAULT_ADMIN_ROLE) {
         emit ModuleAdded(module);
     }
 
+    /// @inheritdoc IComplianceEngine
     function removeModule(address module) external override onlyRole(DEFAULT_ADMIN_ROLE) {
         emit ModuleRemoved(module);
     }
 
+    /// @inheritdoc IComplianceEngine
     function getModules() external pure override returns (address[] memory) {
         return new address[](0);
     }
 
+    /// @inheritdoc IComplianceEngine
     function isModuleBound(address) external pure override returns (bool) {
         return false;
     }
 
+    /**
+     * @notice Pauses compliance checks and transfers.
+     */
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause();
     }
 
+    /**
+     * @notice Resumes compliance checks and transfers.
+     */
     function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {
         // Upgrade authorization restricted to admin (TimelockController in production).
-        (newImplementation);
+        if (newImplementation.code.length == 0) revert ComplianceEngine__NotContract(newImplementation);
+        emit UpgradeAuthorized(newImplementation, msg.sender);
     }
 
     /**

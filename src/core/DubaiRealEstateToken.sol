@@ -64,6 +64,7 @@ contract DubaiRealEstateToken is
     event ForcedBurn(address indexed from, uint256 amount, string reason, address indexed actor);
     event IdentityRegistrySet(address indexed oldRegistry, address indexed newRegistry, address indexed actor);
     event ComplianceEngineSet(address indexed oldEngine, address indexed newEngine, address indexed actor);
+    event UpgradeAuthorized(address indexed newImplementation, address indexed actor);
 
     error DREIT__ZeroAddress();
     error DREIT__NotContract(address addr);
@@ -94,6 +95,15 @@ contract DubaiRealEstateToken is
         _disableInitializers();
     }
 
+    /**
+     * @notice Initializes the DREIT token.
+     * @param _stablecoin The stablecoin used for dividend distributions.
+     * @param _identityRegistry The identity registry contract address.
+     * @param _complianceEngine The compliance engine contract address.
+     * @param _name The token name.
+     * @param _symbol The token symbol.
+     * @param _admin The address receiving admin, issuer and regulator roles.
+     */
     function initialize(
         address _stablecoin,
         address _identityRegistry,
@@ -124,6 +134,11 @@ contract DubaiRealEstateToken is
         _grantRole(REGULATOR_ROLE, _admin);
     }
 
+    /**
+     * @notice Mints new tokens to a verified and compliant investor.
+     * @param to The recipient address.
+     * @param amount The amount to mint.
+     */
     function mint(address to, uint256 amount)
         external
         onlyRole(ISSUER_ROLE)
@@ -154,6 +169,11 @@ contract DubaiRealEstateToken is
         emit TokensMinted(to, amount, msg.sender);
     }
 
+    /**
+     * @notice Mints tokens to multiple investors in a single transaction.
+     * @param recipients Array of recipient addresses.
+     * @param amounts Array of amounts to mint.
+     */
     function batchMint(address[] calldata recipients, uint256[] calldata amounts)
         external
         onlyRole(ISSUER_ROLE)
@@ -197,6 +217,10 @@ contract DubaiRealEstateToken is
         }
     }
 
+    /**
+     * @notice Burns tokens from the caller and pays out any pending dividends.
+     * @param amount The amount to burn.
+     */
     function burn(uint256 amount) external whenNotPaused nonReentrant notFrozen(msg.sender) {
         if (amount == 0) revert DREIT__InvalidAmount();
         address investor = msg.sender;
@@ -225,6 +249,13 @@ contract DubaiRealEstateToken is
         }
     }
 
+    /**
+     * @notice Forces a transfer between two investors by a regulator.
+     * @param from The sender address.
+     * @param to The recipient address.
+     * @param amount The amount to transfer.
+     * @param reason The reason for the forced transfer.
+     */
     function forcedTransfer(address from, address to, uint256 amount, string calldata reason)
         external
         onlyRole(REGULATOR_ROLE)
@@ -250,6 +281,12 @@ contract DubaiRealEstateToken is
         emit ForcedTransfer(from, to, amount, reason, msg.sender);
     }
 
+    /**
+     * @notice Forces a burn from an investor by a regulator.
+     * @param from The address to burn from.
+     * @param amount The amount to burn.
+     * @param reason The reason for the forced burn.
+     */
     function forcedBurn(address from, uint256 amount, string calldata reason)
         external
         onlyRole(REGULATOR_ROLE)
@@ -306,6 +343,9 @@ contract DubaiRealEstateToken is
         emit DividendsDistributed(amount, newDividendPerToken, dividendPerToken, msg.sender);
     }
 
+    /**
+     * @notice Claims all pending dividends for the caller.
+     */
     function claimDividends() external whenNotPaused nonReentrant notFrozen(msg.sender) {
         _validateKYC(msg.sender);
         _syncDividends(msg.sender);
@@ -409,14 +449,31 @@ contract DubaiRealEstateToken is
         }
     }
 
+    /**
+     * @notice Transfers tokens to a verified and compliant recipient.
+     * @param to The recipient address.
+     * @param value The amount to transfer.
+     * @return True if the transfer succeeded.
+     */
     function transfer(address to, uint256 value) public override nonReentrant returns (bool) {
         return super.transfer(to, value);
     }
 
+    /**
+     * @notice Transfers tokens on behalf of another account.
+     * @param from The sender address.
+     * @param to The recipient address.
+     * @param value The amount to transfer.
+     * @return True if the transfer succeeded.
+     */
     function transferFrom(address from, address to, uint256 value) public override nonReentrant returns (bool) {
         return super.transferFrom(from, to, value);
     }
 
+    /**
+     * @notice Sets the identity registry contract.
+     * @param _registry The identity registry address.
+     */
     function setIdentityRegistry(address _registry) external onlyRole(DEFAULT_ADMIN_ROLE) nonZeroAddress(_registry) {
         if (_registry.code.length == 0) revert DREIT__NotContract(_registry);
         address oldRegistry = address(identityRegistry);
@@ -424,6 +481,10 @@ contract DubaiRealEstateToken is
         emit IdentityRegistrySet(oldRegistry, _registry, msg.sender);
     }
 
+    /**
+     * @notice Sets the compliance engine contract.
+     * @param _engine The compliance engine address.
+     */
     function setComplianceEngine(address _engine) external onlyRole(DEFAULT_ADMIN_ROLE) nonZeroAddress(_engine) {
         if (_engine.code.length == 0) revert DREIT__NotContract(_engine);
         address oldEngine = address(complianceEngine);
@@ -431,14 +492,25 @@ contract DubaiRealEstateToken is
         emit ComplianceEngineSet(oldEngine, _engine, msg.sender);
     }
 
+    /**
+     * @notice Pauses all token transfers and mints.
+     */
     function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause();
     }
 
+    /**
+     * @notice Resumes all token transfers and mints.
+     */
     function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _unpause();
     }
 
+    /**
+     * @notice Returns the total claimable dividends for an account.
+     * @param account The account address.
+     * @return The total claimable amount.
+     */
     function getClaimableDividends(address account) external view returns (uint256) {
         uint256 balance = balanceOf(account);
         if (balance == 0) return pendingDividends[account];
@@ -471,7 +543,8 @@ contract DubaiRealEstateToken is
 
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {
         // Upgrade authorization restricted to admin (TimelockController in production).
-        (newImplementation);
+        if (newImplementation.code.length == 0) revert DREIT__NotContract(newImplementation);
+        emit UpgradeAuthorized(newImplementation, msg.sender);
     }
 
     /**

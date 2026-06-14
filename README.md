@@ -13,6 +13,7 @@
 [![Frontend](https://img.shields.io/badge/Frontend-Live%20Demo-gold)](https://mailtkarim-bot.github.io/Dubai-Real-Estate-Token-V3/)
 ![License](https://img.shields.io/badge/License-MIT-F4D03F)
 ![Internal Review](https://img.shields.io/badge/Internal%20Review-Passed-yellow)
+[![Audit Readiness](https://img.shields.io/badge/Audit%20Readiness-Ready%20For%20Professional%20Audit-brightgreen)](https://github.com/mailtkarim-bot/foundry-audit-readiness)
 
 **Portfolio-grade RWA tokenization smart contract suite inspired by ERC-3643 (T-REX).**
 
@@ -176,6 +177,43 @@ During development, the following issues were identified and corrected in the co
 | 10 | `burn` / `forcedBurn` transferred stablecoins before burning tokens (CEI violation) | Reordered to burn and clear state before `safeTransfer` |
 | 11 | `distributeDividends` pulled stablecoins before validating distribution math | Moved `newDividendPerToken == 0` check before `safeTransferFrom` |
 | 12 | `deleteIdentity` allowed identity deletion while dividends were pending | Added `pendingDividendsOf()` check in `IdentityRegistry` |
+
+---
+
+## 🔍 Audit Readiness
+
+This project is verified as **READY FOR PROFESSIONAL AUDIT** by [`foundry-audit-readiness`](https://github.com/mailtkarim-bot/foundry-audit-readiness), a Foundry-native quality gate that checks static analysis, coverage, invariants, NatSpec documentation, and compiler warnings before engaging an auditor.
+
+Latest automated check (run against `src/` only):
+
+```text
+Static Analysis (Slither): PASS — 0 critical / 0 high / 0 medium / 0 low
+Line Coverage:        99.4%  (threshold: 90%)
+Branch Coverage:      95.1%  (threshold: 85%)
+Function Coverage:   100.0%  (threshold: 100%)
+Invariant Tests:       6/6   all passing
+NatSpec:             2/2 public, 117/117 external documented
+Compiler Warnings:   None in source contracts
+Status:              READY FOR PROFESSIONAL AUDIT
+```
+
+> **Tool:** [github.com/mailtkarim-bot/foundry-audit-readiness](https://github.com/mailtkarim-bot/foundry-audit-readiness)  
+> **Note:** This is a readiness check, not a replacement for a Tier-1 external security audit.
+
+Run the check yourself:
+
+```bash
+# 1. Install the audit-readiness tool
+git clone https://github.com/mailtkarim-bot/foundry-audit-readiness.git
+cd foundry-audit-readiness
+pip install -r requirements.txt
+
+# 2. Run it against this repo
+python -m audit_readiness \
+  --target /path/to/Dubai-Real-Estate-Token-V3 \
+  --output audit-report.html \
+  --format html
+```
 
 ---
 

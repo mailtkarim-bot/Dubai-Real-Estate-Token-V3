@@ -949,7 +949,7 @@ contract IdentityRegistryTest is Test {
     // ============================================
     // TEST 46: isVerifiedWithDetails — Unverified status
     // ============================================
-    function test_IsVerifiedWithDetails_Unverified() public {
+    function test_IsVerifiedWithDetails_Unverified() public view {
         (IIdentityRegistry.VerificationStatus status, IIdentityRegistry.InvestorType invType) =
             registry.isVerifiedWithDetails(karim);
         assertEq(uint256(status), uint256(IIdentityRegistry.VerificationStatus.Unverified));
@@ -1144,7 +1144,7 @@ contract IdentityRegistryTest is Test {
     // ============================================
     // TEST 61: getTrustedIssuers — Empty array initially
     // ============================================
-    function test_GetTrustedIssuers_Empty() public {
+    function test_GetTrustedIssuers_Empty() public view {
         address[] memory issuers = registry.getTrustedIssuers();
         assertEq(issuers.length, 0, "Must be empty initially");
     }

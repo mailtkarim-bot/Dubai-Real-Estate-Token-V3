@@ -691,7 +691,7 @@ contract ComplianceEngineTest is Test {
     // ============================================
     // TEST 44: getModules — returns empty array (stub)
     // ============================================
-    function test_GetModules() public {
+    function test_GetModules() public view {
         address[] memory modules = compliance.getModules();
         assertEq(modules.length, 0);
     }

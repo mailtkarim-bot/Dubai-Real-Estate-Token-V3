@@ -34,7 +34,6 @@ contract UpgradeDREIT is Script {
         );
 
         // 3. Encode Timelock schedule call
-        bytes32 predecessor = bytes32(0);
         bytes32 salt = keccak256(abi.encodePacked(block.timestamp, address(newImpl)));
         uint256 minDelay = TimelockController(payable(timelock)).getMinDelay();
 
