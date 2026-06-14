@@ -1,11 +1,9 @@
-import { createConfig, http } from 'wagmi';
+import { getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { sepolia } from 'wagmi/chains';
-import { injected } from 'wagmi/connectors';
 
-export const config = createConfig({
+export const config = getDefaultConfig({
+  appName: 'DREIT - Dubai Real Estate Investment Token',
+  projectId: 'dreit_frontend_demo',
   chains: [sepolia],
-  connectors: [injected({ target: 'metaMask' })],
-  transports: {
-    [sepolia.id]: http('https://rpc.sepolia.org'),
-  },
+  ssr: false,
 });
